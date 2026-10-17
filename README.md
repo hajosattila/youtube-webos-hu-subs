@@ -32,6 +32,7 @@
 - YouTube Logo Removal
 - Remove end screens
 - Bypass account selector screen
+- [Magyar automatikus feliratfordítás – használat és TV-s tesztelés](HU-SUBTITLES.md)
 
 > [!NOTE]
 > Press the 🟩 **Green** button on your remote to access the configuration screen.

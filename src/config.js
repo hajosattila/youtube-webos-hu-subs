@@ -76,6 +76,13 @@ const configOptions = new Map([
       default: false,
       desc: 'Bypass initial account selection on startup'
     }
+  ],
+  [
+    'enableHungarianSubtitles',
+    {
+      default: true,
+      desc: 'Add Hungarian auto-translated subtitles (reopen video)'
+    }
   ]
 ]);
 
