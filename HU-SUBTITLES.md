@@ -80,6 +80,27 @@ Csak rövid nyelvi azonosítók, mezőnevek és állapotjelzők jelenhetnek meg;
 a tokenek, URL-ek, videócímek és más tetszőleges szöveges értékek kimaradnak.
 A kód nem változtatja meg a hangsávot, a menüt vagy a felirat formázását.
 
+## Natív hangsávadat és DIAG v2
+
+A tévéről kapott két diagnosztikai képen a YouTube `getAudioTrack()`
+függvénye `id=und` értéket adott, használható nyelvi adat nélkül.
+Az `und` nem tekinthető angolnak. A `hu-auto-diag2` változat ezért a
+videóelem natív `audioTracks` listáját is megvizsgálja: kizárólag pontosan
+egy engedélyezett hangsáv `language` értékét fogadja el. Nem következtet
+a sáv sorszámából, átlátszatlan azonosítójából vagy a felirat nyelvéből.
+Ellentmondó nyelvi adatoknál sem kapcsol be automatikusan feliratot.
+
+Ez csak akkor segít, ha a webOS a natív hangsávnál valódi nyelvet közöl.
+Ha az is hiányzik vagy `und`, az automatika továbbra sem tud biztonságosan
+különbséget tenni magyar és idegen beszéd között. Beszédfelismerést nem végez.
+
+A `DIAG ... v2` blokkban a `MEDIA` sor a natív hangsávlistát, az `ACTIVE`
+sor az egyetlen engedélyezett hangsávot mutatja. Az `API` sorok kizárólag
+a hangsáv- és feliratkezelő függvények nevét sorolják fel. A diagnosztika
+az A1 mellett C2 hibánál is látható. A felirat bekapcsolásához a kód a
+`toggleSubtitlesOn` elnevezést is támogatja, ha a lejátszóban létezik;
+az eredményt az `isSubtitlesOn` állapotból ellenőrzi.
+
 ## Mit módosít a kód?
 
 A meglévő `JSON.parse` hook mögé kapcsolódva a YouTube player-válaszában

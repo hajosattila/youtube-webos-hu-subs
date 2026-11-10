@@ -1,8 +1,107 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { audioLanguage, AutomaticCaptions } from '../src/automatic-captions.ts';
+import {
+  audioLanguage,
+  AutomaticCaptions,
+  mediaAudioSnapshot
+} from '../src/automatic-captions.ts';
 import { addHungarianSubtitles } from '../src/subtitle-tracks.ts';
 import { captionDiagnostics } from '../src/caption-diagnostics.ts';
+
+test('native audio snapshot reads the enabled media track, not the first track', () => {
+  const result = mediaAudioSnapshot({
+    audioTracks: [
+      { language: 'en', enabled: false },
+      { language: 'hu', enabled: true }
+    ]
+  });
+  assert.deepEqual(result.selected, { language: 'hu' });
+});
+
+test('native audio snapshot supports the browser array-like AudioTrackList', () => {
+  const result = mediaAudioSnapshot({
+    audioTracks: { 0: { language: 'en', enabled: true }, length: 1 }
+  });
+  assert.deepEqual(result.selected, { language: 'en' });
+});
+
+test('ambiguous, unavailable and unselected native tracks stay unknown', () => {
+  for (const video of [
+    null,
+    {},
+    { audioTracks: [] },
+    { audioTracks: [{ language: 'en', enabled: false }] },
+    {
+      audioTracks: [
+        { language: 'hu', enabled: true },
+        { language: 'en', enabled: true }
+      ]
+    }
+  ])
+    assert.equal(mediaAudioSnapshot(video).selected, null);
+});
+
+test('opaque native IDs are never used as language codes', () => {
+  const result = mediaAudioSnapshot({
+    audioTracks: [{ id: 'en.0', language: '', enabled: true }]
+  });
+  assert.equal(audioLanguage(result.selected), null);
+});
+
+test('native media language enables Hungarian captions when the player reports und', () => {
+  const { player, state, controller } = fixture();
+  state.audio = { id: 'und' };
+  controller.update(player, { language: 'en' });
+  assert.equal(state.enabled, true);
+  assert.equal(state.selection.languageCode, 'hu');
+});
+
+test('native Hungarian audio does not enable captions when the player reports und', () => {
+  const { player, state, controller } = fixture();
+  state.audio = { id: 'und' };
+  controller.update(player, { language: 'hu' });
+  assert.equal(state.enabled, false);
+  assert.equal(state.loads, 0);
+});
+
+test('two und audio sources do not trigger caption enabling', () => {
+  const { player, state, controller } = fixture();
+  state.audio = { id: 'und' };
+  controller.update(player, { language: 'und' });
+  assert.equal(state.enabled, false);
+  assert.equal(state.toggles, 0);
+});
+
+test('conflicting active audio language sources do not select captions', () => {
+  const { player, state, controller } = fixture();
+  controller.update(player, { language: 'hu' });
+  assert.equal(state.calls.length, 0);
+  assert.equal(state.loads, 0);
+});
+
+test('the TV toggleSubtitlesOn variant can enable CC without toggleSubtitles', () => {
+  const { player, state, controller } = fixture();
+  delete player.toggleSubtitles;
+  player.toggleSubtitlesOn = () => {
+    state.enabled = true;
+  };
+  controller.update(player);
+  assert.equal(state.enabled, true);
+  assert.equal(state.selection.languageCode, 'hu');
+});
+
+test('v2 diagnostics include native language and public subtitle method names', () => {
+  const report = captionDiagnostics(
+    { toggleSubtitlesOn() {}, setSubtitlesTrack() {} },
+    {
+      tracks: [{ enabled: true, language: 'hu' }],
+      selected: { language: 'hu' }
+    }
+  );
+  assert.match(report, /MEDIA=.*language=hu/);
+  assert.match(report, /API=.*toggleSubtitlesOn/);
+  assert.match(report, /API=.*setSubtitlesTrack/);
+});
 
 test('audio diagnostics show API availability and actual locale fields', () => {
   const summary = captionDiagnostics({
@@ -78,8 +177,12 @@ function fixture() {
     getVideoData: () => ({ video_id: state.video }),
     getAudioTrack: () => state.audio,
     getPlayerResponse: () => ({ videoDetails: { videoId: state.video } }),
-    getOption: (_module, key) =>
-      key === 'tracklist' ? state.tracks : state.selection,
+    getOption: (module, key) =>
+      module === 'captions'
+        ? key === 'tracklist'
+          ? state.tracks
+          : state.selection
+        : null,
     setOption: (module, key, value) => {
       state.calls.push({ module, key, value });
       state.selection = value;

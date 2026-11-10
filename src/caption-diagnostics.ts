@@ -53,7 +53,11 @@ function summarize(value: unknown, depth = 0): string {
     : `keys(${keys.slice(0, 8).join(',')})`;
 }
 
-export function captionDiagnostics(player: unknown): string {
+export function captionDiagnostics(
+  player: unknown,
+  media?: { tracks: unknown; selected: unknown },
+  code = 'A1'
+): string {
   if (!isObject(player)) return 'DIAG: no player';
   const target = player;
   function read(method: string, ...args: string[]): unknown {
@@ -70,7 +74,8 @@ export function captionDiagnostics(player: unknown): string {
     'getOption',
     'getPlayerResponse',
     'isSubtitlesOn',
-    'toggleSubtitles'
+    'toggleSubtitles',
+    'toggleSubtitlesOn'
   ].map((name) => `${name}:${typeof target[name] === 'function' ? 1 : 0}`);
   const response = read('getPlayerResponse');
   const streaming =
@@ -89,14 +94,33 @@ export function captionDiagnostics(player: unknown): string {
     ? captions.playerCaptionsTracklistRenderer
     : {};
   const lines = [
-    'DIAG A1 (audio / options / available / video)',
+    `DIAG ${code} v2 (native media audio + player)`,
     ...flags,
     `A=${summarize(read('getAudioTrack'))}`,
     `O=${summarize(read('getOption', 'audio', 'track'))}`,
     `L=${summarize(read('getAvailableAudioTracks'))}`,
     `V=${summarize(read('getVideoData'))}`,
     `RA=${summarize(audio)}`,
-    `RC=${summarize(renderer.audioTracks)}`
+    `RC=${summarize(renderer.audioTracks)}`,
+    `MEDIA=${summarize(media?.tracks)}`,
+    `ACTIVE=${summarize(media?.selected)}`
   ];
+  let prototype: object | null = target;
+  const methods = new Set<string>();
+  for (let depth = 0; prototype && depth < 3; depth++) {
+    const properties = Object.getOwnPropertyDescriptors(prototype);
+    for (const [name, property] of Object.entries(properties)) {
+      if (
+        /(audio|caption|subtitle)/i.test(name) &&
+        /^[a-z0-9_]{1,48}$/i.test(name) &&
+        typeof property.value === 'function'
+      )
+        methods.add(name);
+    }
+    prototype = Object.getPrototypeOf(prototype);
+  }
+  const names = [...methods].sort().slice(0, 24);
+  for (let i = 0; i < names.length; i += 3)
+    lines.push(`API=${names.slice(i, i + 3).join(',')}`);
   return lines.map((line) => line.slice(0, 150)).join('\n');
 }

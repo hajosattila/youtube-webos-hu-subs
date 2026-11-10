@@ -19,11 +19,47 @@ export function audioLanguage(track: unknown): string | null {
   const info = isObject(track.languageInfo) ? track.languageInfo : {};
   return (
     languageCode(track.languageCode) ??
+    languageCode(track.language) ??
     languageCode(info.id) ??
     languageCode(info.code) ??
     languageCode(track.audioTrackId) ??
     languageCode(track.id)
   );
+}
+
+export function mediaAudioSnapshot(video: unknown): {
+  tracks: Data[] | null;
+  selected: Data | null;
+} {
+  try {
+    if (!isObject(video)) return { tracks: null, selected: null };
+    const list = video.audioTracks;
+    if (!isObject(list) && !Array.isArray(list))
+      return { tracks: null, selected: null };
+    const length = (list as { length?: unknown }).length;
+    if (
+      typeof length !== 'number' ||
+      !Number.isInteger(length) ||
+      length < 0 ||
+      length > 64
+    )
+      return { tracks: null, selected: null };
+    const tracks: Data[] = [];
+    for (let i = 0; i < length; i++) {
+      const track: unknown = (list as Record<number, unknown>)[i];
+      if (!isObject(track)) continue;
+      tracks.push({ language: track.language, enabled: track.enabled });
+    }
+    const enabled = tracks.filter((track) => track.enabled === true);
+    // Only the actually enabled native track counts. Do not assume index zero,
+    // the first available language, or an opaque media-track ID is the language.
+    return {
+      tracks,
+      selected: enabled.length === 1 ? { language: enabled[0]!.language } : null
+    };
+  } catch {
+    return { tracks: null, selected: null };
+  }
 }
 
 export interface CaptionPlayer {
@@ -39,6 +75,7 @@ export interface CaptionPlayer {
   setSubtitlesTrack?(track: unknown): void;
   isSubtitlesOn?(): boolean;
   toggleSubtitles?(): void;
+  toggleSubtitlesOn?(): void;
 }
 
 export class AutomaticCaptions {
@@ -65,9 +102,9 @@ export class AutomaticCaptions {
     this.#reported = false;
   }
 
-  update(player: CaptionPlayer) {
+  update(player: CaptionPlayer, mediaTrack?: unknown) {
     try {
-      this.#update(player);
+      this.#update(player, mediaTrack);
     } catch {
       // Unsupported/temporarily unavailable player APIs must not break playback.
       this.#attempts++;
@@ -75,15 +112,20 @@ export class AutomaticCaptions {
     }
   }
 
-  #update(player: CaptionPlayer) {
+  #update(player: CaptionPlayer, mediaTrack: unknown) {
     const video = player.getVideoData().video_id;
     if (!video) {
       this.reset();
       return;
     }
-    const track =
-      player.getAudioTrack?.() ?? player.getOption?.('audio', 'track');
-    const language = audioLanguage(track);
+    const playerLanguage =
+      audioLanguage(player.getAudioTrack?.()) ??
+      audioLanguage(player.getOption?.('audio', 'track'));
+    const nativeLanguage = audioLanguage(mediaTrack);
+    const language =
+      playerLanguage && nativeLanguage && playerLanguage !== nativeLanguage
+        ? null
+        : (playerLanguage ?? nativeLanguage);
     // Read the selected audio, never the title, UI language or subtitle language.
     const key = `${video}:${language ?? '?'}`;
     if (key !== this.#key) {
@@ -139,10 +181,10 @@ export class AutomaticCaptions {
 
     if (
       player.isSubtitlesOn?.() === false &&
-      player.toggleSubtitles &&
+      (player.toggleSubtitles || player.toggleSubtitlesOn) &&
       !this.#toggled
     ) {
-      player.toggleSubtitles();
+      (player.toggleSubtitles ?? player.toggleSubtitlesOn)!.call(player);
       this.#toggled = true;
     }
 
