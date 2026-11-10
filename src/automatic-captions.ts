@@ -87,6 +87,7 @@ export class AutomaticCaptions {
   #toggled = false;
   #reported = false;
   #onFailure;
+  #language: string | null = null;
 
   constructor(onFailure: (message: string) => void = console.warn) {
     this.#onFailure = onFailure;
@@ -100,6 +101,18 @@ export class AutomaticCaptions {
     this.#selected = false;
     this.#toggled = false;
     this.#reported = false;
+    this.#language = null;
+  }
+
+  getStatus() {
+    return {
+      language: this.#language,
+      attempts: this.#attempts,
+      done: this.#done,
+      loaded: this.#loaded,
+      selected: this.#selected,
+      toggled: this.#toggled
+    };
   }
 
   update(player: CaptionPlayer, mediaTrack?: unknown) {
@@ -132,6 +145,7 @@ export class AutomaticCaptions {
       this.reset();
       this.#key = key;
     }
+    this.#language = language;
     if (this.#done || this.#attempts >= 24) return;
     this.#attempts++;
     if (!language) {
@@ -166,16 +180,17 @@ export class AutomaticCaptions {
       player.loadModule?.('captions');
       this.#loaded = true;
     }
-    const tracks =
-      player.getSubtitlesTrackList?.() ??
-      player.getOption?.('captions', 'tracklist');
-    const hungarian = Array.isArray(tracks)
-      ? tracks.find(
-          (caption: unknown) =>
-            isObject(caption) && languageCode(caption.languageCode) === 'hu'
-        )
-      : undefined;
+    const nativeTracks = player.getSubtitlesTrackList?.();
+    const optionTracks = player.getOption?.('captions', 'tracklist');
+    const tracks = [nativeTracks, optionTracks].flatMap((list) =>
+      Array.isArray(list) ? list : []
+    );
+    const hungarian = tracks.find(
+      (caption: unknown) =>
+        isObject(caption) && languageCode(caption.languageCode) === 'hu'
+    );
     if (!hungarian) {
+      this.#failure('C1: a lejátszó nem kínál magyar feliratsávot');
       return;
     }
 

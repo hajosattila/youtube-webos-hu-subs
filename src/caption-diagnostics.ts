@@ -33,7 +33,7 @@ function summarize(value: unknown, depth = 0): string {
   if (!isObject(value)) return typeof value;
   if (depth >= 3) return 'object';
   if (Array.isArray(value))
-    return `[${value
+    return `list(${value.length})[${value
       .slice(0, 3)
       .map((item) => summarize(item, depth + 1))
       .join(';')}]`;
@@ -94,7 +94,7 @@ export function captionDiagnostics(
     ? captions.playerCaptionsTracklistRenderer
     : {};
   const lines = [
-    `DIAG ${code} v2 (native media audio + player)`,
+    `DIAG ${code} (0.5.4)`,
     ...flags,
     `A=${summarize(read('getAudioTrack'))}`,
     `O=${summarize(read('getOption', 'audio', 'track'))}`,
@@ -105,6 +105,14 @@ export function captionDiagnostics(
     `MEDIA=${summarize(media?.tracks)}`,
     `ACTIVE=${summarize(media?.selected)}`
   ];
+  lines.push(`CC-TV=${summarize(read('getSubtitlesTrackList'))}`);
+  lines.push(`CC-OPT=${summarize(read('getOption', 'captions', 'tracklist'))}`);
+  lines.push(`CC-ACTIVE=${summarize(read('getSubtitlesTrack'))}`);
+  lines.push(
+    `CC-SELECTED=${summarize(read('getOption', 'captions', 'track'))}`
+  );
+  lines.push(`RESP-CC=${summarize(renderer.captionTracks)}`);
+  lines.push(`CC-ON=${summarize(read('isSubtitlesOn'))}`);
   let prototype: object | null = target;
   const methods = new Set<string>();
   for (let depth = 0; prototype && depth < 3; depth++) {

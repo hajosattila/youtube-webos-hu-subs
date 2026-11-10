@@ -477,6 +477,28 @@ test('unreadable audio metadata produces a useful bounded diagnosis', () => {
   assert.match(failures[0], /^A1:/);
 });
 
+test('an empty native caption list does not mask a populated option list', () => {
+  const { player, state, controller } = fixture();
+  player.getSubtitlesTrackList = () => [];
+  controller.update(player);
+  assert.equal(state.enabled, true);
+  assert.equal(state.selection.languageCode, 'hu');
+});
+
+test('missing Hungarian captions produce a single C1 diagnosis with state', () => {
+  const { player, state } = fixture();
+  const errors = [];
+  const controller = new AutomaticCaptions((reason) => errors.push(reason));
+  state.tracks = [];
+  for (let i = 0; i < 30; i++) controller.update(player);
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /^C1:/);
+  assert.equal(controller.getStatus().language, 'en');
+  assert.equal(controller.getStatus().done, false);
+  assert.equal(controller.getStatus().attempts, 24);
+  assert.equal(state.enabled, false);
+});
+
 test('the injected Hungarian caption can be selected by the automatic policy', () => {
   const data = addHungarianSubtitles({
     captions: {

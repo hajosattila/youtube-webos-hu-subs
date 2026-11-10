@@ -101,6 +101,24 @@ az A1 mellett C2 hibánál is látható. A felirat bekapcsolásához a kód a
 `toggleSubtitlesOn` elnevezést is támogatja, ha a lejátszóban létezik;
 az eredményt az `isSubtitlesOn` állapotból ellenőrzi.
 
+## D3 / 0.5.4: néma leállás vizsgálata
+
+A korábbi verzióban a feliratlistában nem található magyar sáv csendes
+visszatérést okozott. Ezt a változat `C1` állapotként jelzi. Az üres natív
+lista már nem takarja el a másik lejátszófüggvényből olvasható sávokat.
+
+A D3 csomag valódi alkalmazásverziója 0.5.4, így megkülönböztethető a
+korábbi 0.5.3-as tesztcsomagoktól. Indításkor nyolc másodpercre kiírja a
+`HU AUTO D3 – 0.5.4` jelzést. Videóindítás után legkésőbb körülbelül
+15 másodperccel akkor is mutat állapotblokkot, ha az automatika sikeresnek
+tekintette a műveletet vagy a lejátszási mód miatt nem avatkozott be.
+A lejátszó hiánya P0, a videóazonosító hiánya V0 jelzést adhat.
+
+A blokkban a `STATE` az automatika nyelvét és állapotjelzőit mutatja,
+a `CC-TV` és `CC-OPT` a feliratlisták szűrt adatait, a `CC-ON` a CC állapotát.
+Az alkalmazásba visszatéréskor az alapbeállítás újra alkalmazható ugyanazon
+videón is. A D3 továbbra is diagnosztikai tesztváltozat; nem igazolt TV-s javítás.
+
 ## Mit módosít a kód?
 
 A meglévő `JSON.parse` hook mögé kapcsolódva a YouTube player-válaszában
