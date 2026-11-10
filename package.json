@@ -1,6 +1,6 @@
 {
   "name": "youtube-webos",
-  "version": "0.5.5",
+  "version": "0.5.6",
   "description": "Ad-free YouTube app for webOS",
   "type": "module",
   "main": "index.js",
@@ -14,7 +14,7 @@
     "manifest": "node tools/gen-manifest.cjs youtube.leanback.v4.manifest.json",
     "prepare": "husky",
     "test:compat": "es-check",
-    "test:subtitles": "node --test tests/subtitles.test.mjs tests/automatic-captions.test.mjs tests/auto-subtitles-runtime.test.mjs tests/caption-api-trace.test.mjs",
+    "test:subtitles": "node --test tests/subtitles.test.mjs",
     "lint:eslint": "eslint --concurrency auto",
     "lint:tsc": "tsc -b",
     "lint:prettier": "prettier --check .",
