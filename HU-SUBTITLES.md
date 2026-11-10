@@ -40,6 +40,24 @@ TV-s ellenőrzéshez próbálj egymás után angol, magyar, majd ismét angol
 hangú videót. Ellenőrizd a kézi feliratkapcsolás megtartását is ugyanazon
 videón belül, és ha van rá lehetőség, a hangsáv nyelvének váltását.
 
+A CC-javítást tartalmazó változat a felirat tényleges be-/kikapcsolt állapotát
+is kezeli. A magyar sáv kiválasztása önmagában nem jelentett bekapcsolt CC-t:
+ez különösen az alkalmazás újraindítása után okozhatott hibát.
+A javítás a CC állapotát lekérdezi, szükség esetén bekapcsolja, és csak
+bekapcsolt CC plusz visszaolvasott magyar sáv esetén jelzi sikeresnek a műveletet.
+Az újraindítást utánzó tesztek külön tárolják a sávválasztást és a CC állapotát.
+
+Az új IPK-nál ezt is próbáld ki: angol videó → teljes alkalmazásbezárás →
+újraindítás → ugyanaz a videó, a CC gomb megnyomása nélkül.
+Ezután ellenőrizd egy magyar videón, hogy alapból nincs felirat.
+
+Ha az automatika körülbelül 12 másodperc után sem tudja igazolni a bekapcsolást,
+egyszeri, tíz másodpercig látható üzenetet adhat. Az `A1` olvashatatlan
+hangsávnyelvet, a `C0` hiányzó feliratválasztó függvényt, a `C2` nem igazolható
+bekapcsolást, a `P1` lejátszó-API hibát jelez. Ezeket a kódokat elég megírni;
+nem tartalmaznak tokent vagy aláírt URL-t. Hiányzó magyar sávnál nem kapcsol
+be helyette egy másik nyelvet. A kézi CC gomb továbbra is használható.
+
 Meglévő magyar feliratsáv mellé nem kerül újabb magyar sáv. Felirat nélküli
 videóhoz a funkció nem készít beszédfelismerést, és a kifejezetten nem
 fordítható sávokat sem használja. Több hangsáv esetén az alapértelmezett

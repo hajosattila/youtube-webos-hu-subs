@@ -34,6 +34,11 @@ export interface CaptionPlayer {
   setOption?(module: string, option: string, value: unknown): void;
   loadModule?(module: string): void;
   unloadModule?(module: string): void;
+  getSubtitlesTrackList?(): unknown;
+  getSubtitlesTrack?(): unknown;
+  setSubtitlesTrack?(track: unknown): void;
+  isSubtitlesOn?(): boolean;
+  toggleSubtitles?(): void;
 }
 
 export class AutomaticCaptions {
@@ -41,12 +46,23 @@ export class AutomaticCaptions {
   #done = false;
   #attempts = 0;
   #loaded = false;
+  #selected = false;
+  #toggled = false;
+  #reported = false;
+  #onFailure;
+
+  constructor(onFailure: (message: string) => void = console.warn) {
+    this.#onFailure = onFailure;
+  }
 
   reset() {
     this.#key = null;
     this.#done = false;
     this.#attempts = 0;
     this.#loaded = false;
+    this.#selected = false;
+    this.#toggled = false;
+    this.#reported = false;
   }
 
   update(player: CaptionPlayer) {
@@ -55,6 +71,7 @@ export class AutomaticCaptions {
     } catch {
       // Unsupported/temporarily unavailable player APIs must not break playback.
       this.#attempts++;
+      this.#failure('P1: a lejátszó feliratkezelése nem válaszol');
     }
   }
 
@@ -64,19 +81,21 @@ export class AutomaticCaptions {
       this.reset();
       return;
     }
-    if (!player.getOption || !player.setOption || !player.getAudioTrack) return;
-
-    const track = player.getAudioTrack();
+    const track =
+      player.getAudioTrack?.() ?? player.getOption?.('audio', 'track');
     const language = audioLanguage(track);
     // Read the selected audio, never the title, UI language or subtitle language.
-    if (!language) return;
-
-    const key = `${video}:${language}`;
+    const key = `${video}:${language ?? '?'}`;
     if (key !== this.#key) {
       this.reset();
       this.#key = key;
     }
     if (this.#done || this.#attempts >= 24) return;
+    this.#attempts++;
+    if (!language) {
+      this.#failure('A1: a hangsáv nyelve nem olvasható');
+      return;
+    }
 
     // A player can briefly expose the previous video's caption state.
     const response = player.getPlayerResponse?.();
@@ -85,16 +104,29 @@ export class AutomaticCaptions {
       if (typeof responseVideo === 'string' && responseVideo !== video) return;
     }
 
-    this.#attempts++;
     if (language === 'hu') {
-      player.setOption('captions', 'track', {});
-      player.unloadModule?.('captions');
-      this.#done = true;
-      console.info('[subtitles] Hungarian audio: automatic captions off');
+      if (!this.#selected) {
+        if (player.isSubtitlesOn?.() === true && player.toggleSubtitles) {
+          player.toggleSubtitles();
+        } else {
+          player.setOption?.('captions', 'track', {});
+          player.unloadModule?.('captions');
+        }
+        this.#selected = true;
+      }
+      if (player.isSubtitlesOn?.() === false) this.#done = true;
       return;
     }
 
-    const tracks = player.getOption('captions', 'tracklist');
+    // A cached track list does not mean CC is enabled. Always load captions,
+    // then explicitly turn CC on when the player exposes its toggle API.
+    if (!this.#loaded) {
+      player.loadModule?.('captions');
+      this.#loaded = true;
+    }
+    const tracks =
+      player.getSubtitlesTrackList?.() ??
+      player.getOption?.('captions', 'tracklist');
     const hungarian = Array.isArray(tracks)
       ? tracks.find(
           (caption: unknown) =>
@@ -102,16 +134,48 @@ export class AutomaticCaptions {
         )
       : undefined;
     if (!hungarian) {
-      if (!this.#loaded) {
-        player.loadModule?.('captions');
-        this.#loaded = true;
-      }
       return;
     }
 
-    player.setOption('captions', 'track', hungarian);
-    // Apply once per video/audio language. Later manual choices take precedence.
-    this.#done = true;
-    console.info('[subtitles] Foreign audio: Hungarian captions selected');
+    if (
+      player.isSubtitlesOn?.() === false &&
+      player.toggleSubtitles &&
+      !this.#toggled
+    ) {
+      player.toggleSubtitles();
+      this.#toggled = true;
+    }
+
+    if (!this.#selected) {
+      if (player.setSubtitlesTrack) player.setSubtitlesTrack(hungarian);
+      else if (player.setOption)
+        player.setOption('captions', 'track', hungarian);
+      else {
+        this.#failure('C0: a feliratválasztó függvény nem érhető el');
+        return;
+      }
+      this.#selected = true;
+    }
+    const current =
+      player.getSubtitlesTrack?.() ?? player.getOption?.('captions', 'track');
+    if (
+      player.isSubtitlesOn?.() === true &&
+      isObject(current) &&
+      languageCode(current.languageCode) === 'hu'
+    ) {
+      // Only report success after both the CC state and selection are confirmed.
+      // Later manual choices must not trigger another toggle or track selection.
+      this.#done = true;
+      console.info('[subtitles] Foreign audio: Hungarian captions enabled');
+    } else {
+      this.#failure('C2: a magyar felirat bekapcsolása nem igazolható');
+    }
+  }
+
+  #failure(message: string) {
+    if (this.#attempts >= 24 && !this.#reported) {
+      this.#reported = true;
+      this.#onFailure(message);
+    }
   }
 }

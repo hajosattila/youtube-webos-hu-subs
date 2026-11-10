@@ -10,6 +10,8 @@ function fixture() {
     audio: { languageCode: 'en' },
     tracks: [hu],
     selection: {},
+    enabled: false,
+    toggles: 0,
     calls: [],
     loads: 0,
     unloads: 0
@@ -29,6 +31,12 @@ function fixture() {
     },
     unloadModule: () => {
       state.unloads++;
+      state.enabled = false;
+    },
+    isSubtitlesOn: () => state.enabled,
+    toggleSubtitles: () => {
+      state.toggles++;
+      state.enabled = !state.enabled;
     }
   };
   return { player, state, hu, controller: new AutomaticCaptions() };
@@ -79,9 +87,11 @@ test('manual subtitle disabling is preserved after automatic enabling', () => {
   const { player, state, controller } = fixture();
   controller.update(player);
   state.selection = {};
+  state.enabled = false;
   for (let i = 0; i < 30; i++) controller.update(player);
   assert.deepEqual(state.selection, {});
   assert.equal(state.calls.length, 1);
+  assert.equal(state.toggles, 1);
 });
 
 test('manual subtitle enabling is preserved on Hungarian audio', () => {
@@ -100,7 +110,7 @@ test('new videos reapply the default without changing the audio', () => {
   state.video = 'video-2';
   state.audio = { languageCode: 'hu' };
   controller.update(player);
-  assert.deepEqual(state.selection, {});
+  assert.equal(state.enabled, false);
   state.video = 'video-3';
   state.audio = { languageCode: 'de' };
   controller.update(player);
@@ -113,7 +123,7 @@ test('switching between Hungarian and English within a video updates captions', 
   controller.update(player);
   state.audio = { languageCode: 'hu' };
   controller.update(player);
-  assert.deepEqual(state.selection, {});
+  assert.equal(state.enabled, false);
   state.audio = { languageCode: 'en' };
   controller.update(player);
   assert.equal(state.selection.languageCode, 'hu');
@@ -193,6 +203,117 @@ test('an idle player does not select captions', () => {
   state.video = undefined;
   controller.update(player);
   assert.equal(state.calls.length, 0);
+});
+
+test('CC is enabled even when the Hungarian track list is already cached', () => {
+  const { player, state, hu, controller } = fixture();
+  state.selection = hu;
+  controller.update(player);
+  assert.equal(state.loads, 1);
+  assert.equal(state.toggles, 1);
+  assert.equal(state.enabled, true);
+  assert.equal(state.selection, hu);
+});
+
+test('restarting the app enables CC again on the same video', () => {
+  const { player, state, controller } = fixture();
+  controller.update(player);
+  assert.equal(state.enabled, true);
+  // Selection survives app closure but the CC switch does not.
+  state.enabled = false;
+  const restarted = new AutomaticCaptions();
+  restarted.update(player);
+  assert.equal(state.enabled, true);
+  assert.equal(state.selection.languageCode, 'hu');
+  assert.equal(state.toggles, 2);
+});
+
+test('does not toggle CC off if subtitles are already on', () => {
+  const { player, state, controller } = fixture();
+  state.enabled = true;
+  controller.update(player);
+  assert.equal(state.enabled, true);
+  assert.equal(state.toggles, 0);
+});
+
+test('a delayed CC toggle is requested only once and then confirmed', () => {
+  const { player, state, controller } = fixture();
+  player.toggleSubtitles = () => {
+    state.toggles++;
+  };
+  for (let i = 0; i < 4; i++) controller.update(player);
+  assert.equal(state.toggles, 1);
+  state.enabled = true;
+  controller.update(player);
+  state.enabled = false;
+  controller.update(player);
+  assert.equal(state.enabled, false);
+  assert.equal(state.toggles, 1);
+});
+
+test('supports TV-native caption APIs without the getOption interface', () => {
+  const { player, state, controller } = fixture();
+  delete player.getOption;
+  delete player.setOption;
+  player.getSubtitlesTrackList = () => state.tracks;
+  player.getSubtitlesTrack = () => state.selection;
+  player.setSubtitlesTrack = (track) => {
+    state.selection = track;
+  };
+  controller.update(player);
+  assert.equal(state.enabled, true);
+  assert.equal(state.selection.languageCode, 'hu');
+});
+
+test('a no-op track setter is not counted as successful activation', () => {
+  const { player } = fixture();
+  const failures = [];
+  player.setOption = () => {};
+  const controller = new AutomaticCaptions((reason) => failures.push(reason));
+  for (let i = 0; i < 30; i++) controller.update(player);
+  assert.equal(failures.length, 1);
+  assert.match(failures[0], /^C2:/);
+});
+
+test('a player that cannot enable CC reports the activation failure once', () => {
+  const { player } = fixture();
+  delete player.toggleSubtitles;
+  const failures = [];
+  const controller = new AutomaticCaptions((reason) => failures.push(reason));
+  for (let i = 0; i < 30; i++) controller.update(player);
+  assert.equal(failures.length, 1);
+  assert.match(failures[0], /^C2:/);
+});
+
+test('does not toggle on an unrelated language when Hungarian captions are absent', () => {
+  const { player, state, controller } = fixture();
+  state.tracks = [{ languageCode: 'en' }];
+  for (let i = 0; i < 30; i++) controller.update(player);
+  assert.equal(state.enabled, false);
+  assert.equal(state.toggles, 0);
+});
+
+test('Hungarian audio disables an already active CC switch once', () => {
+  const { player, state, controller } = fixture();
+  state.audio = { languageCode: 'hu' };
+  state.enabled = true;
+  controller.update(player);
+  assert.equal(state.enabled, false);
+  assert.equal(state.toggles, 1);
+  state.enabled = true;
+  controller.update(player);
+  assert.equal(state.enabled, true);
+  assert.equal(state.toggles, 1);
+});
+
+test('unreadable audio metadata produces a useful bounded diagnosis', () => {
+  const { player, state } = fixture();
+  state.audio = null;
+  const failures = [];
+  const controller = new AutomaticCaptions((reason) => failures.push(reason));
+  for (let i = 0; i < 30; i++) controller.update(player);
+  assert.equal(failures.length, 1);
+  assert.match(failures[0], /^A1:/);
 });
 
 test('the injected Hungarian caption can be selected by the automatic policy', () => {

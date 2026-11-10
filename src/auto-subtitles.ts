@@ -1,9 +1,13 @@
 import { AutomaticCaptions, type CaptionPlayer } from './automatic-captions';
 import { getPlayerManager, PlayerMode } from './player_api';
+import { showNotification } from './ui';
 
 getPlayerManager()
   .then((manager) => {
-    const automatic = new AutomaticCaptions();
+    const automatic = new AutomaticCaptions((message) => {
+      console.warn('[subtitles]', message);
+      showNotification(`Automatikus felirat: ${message}`, 10000);
+    });
     const update = () => {
       if (manager.playerMode !== PlayerMode.NORMAL) return;
       automatic.update(manager.player as typeof manager.player & CaptionPlayer);
