@@ -1,88 +1,65 @@
-# Magyar automatikus feliratfordítás
+# Magyar feliratfordítás
 
-Ez a változat a YouTube saját fordítási szolgáltatásával kér magyar feliratot.
-Nem tartalmaz DeepL-integrációt vagy új külső függőséget.
-
-## Kipróbálás LG webOS tévén
-
-1. Telepítsd a módosított IPK-t a megszokott webOS Dev Managerrel.
-2. Zárd be teljesen az alkalmazást, majd indítsd újra. Ha a régi alkalmazás a
-   háttérben maradt, az új kód még nem feltétlenül töltődött be.
-3. Nyiss meg egy olyan videót, amelyhez van működő, fordítható felirat,
-   például angol automatikusan generált felirat.
-4. A videó YouTube-feliratmenüjében keresd a
-   **Magyar (automatikus fordítás)** lehetőséget, és válaszd ki.
-   A TV felületétől függően a lista megjelenítése eltérhet.
-5. Ellenőrizd, hogy magyar szöveg jelenik meg, és a videóhoz igazodik.
-   Próbáld ki az előre/hátra tekerést és egy másik videót is.
-
-A magyar fordítás felkínálása mindig engedélyezett, de a feliratot kézzel,
-a YouTube saját feliratmenüjében vagy a CC gombbal kell bekapcsolni.
+Ez a fork a YouTube saját fordításával kínál magyar feliratot. A feliratot
+kézzel, a CC gombbal vagy a YouTube feliratmenüjében kell bekapcsolni.
 A zöld gombos alkalmazásmenüben nincs külön magyar feliratkapcsoló.
 A korábbi kapcsoló elmentett értéke nem befolyásolja a működést.
 
-A 0.5.6-os változat a korábban működő magyar fordítási kódot állítja vissza,
-az OSD-kapcsoló eltávolításának megtartásával. Nincs benne hangsávnyelv
-alapján automatikus feliratkapcsolás, diagnosztikai panel vagy CC-megfigyelő.
-A verziószám azért magasabb, hogy a 0.5.4/0.5.5 tesztváltozatokra is
-frissítésként telepíthető legyen.
+Nincs benne hangsávnyelv alapján automatikus feliratkapcsolás, diagnosztikai
+panel vagy CC-megfigyelő. Nem használ DeepL-t vagy új külső függőséget.
+A kézi magyar fordítást a felhasználó már működőként visszaigazolta a tévén.
 
-Meglévő magyar feliratsáv mellé nem kerül újabb magyar sáv. Felirat nélküli
-videóhoz a funkció nem készít beszédfelismerést, és a kifejezetten nem
-fordítható sávokat sem használja. Több hangsáv esetén az alapértelmezett
-hangsáv feliratforrását részesíti előnyben, és csak az ehhez a forráshoz
-kapcsolódó feliratlistákat bővíti; más hangsávra váltva az új opció hiányozhat.
+## Telepítés és használat
 
-## Mit módosít a kód?
+1. Töltsd le az [aktuális, 0.5.6-os IPK-t](https://github.com/hajosattila/youtube-webos-hu-subs/raw/refs/heads/main/downloads/youtube.leanback.v4_0.5.6_all.ipk).
+2. Telepítsd a webOS Dev Managerrel, majd teljesen zárd be és indítsd újra az alkalmazást.
+3. Nyiss meg egy működő, fordítható felirattal rendelkező videót.
+4. A YouTube feliratmenüjében válaszd a **Magyar (automatikus fordítás)** sávot.
+5. A CC gombbal kézzel ki- és bekapcsolhatod a feliratot.
 
-A meglévő `JSON.parse` hook mögé kapcsolódva a YouTube player-válaszában
-keres fordítható feliratsávot. A meglévő sáv címét `tlang=hu` célnyelvvel
-használja fel egy új, magyar sávhoz. Az eredeti forrásnyelv és a kérés
-hitelesítési paraméterei megmaradnak; az eredeti sáv és az alapértelmezett
-feliratválasztás nem változik. Az új sáv indexe a hozzá tartozó hangsávok
-feliratlistáiba is bekerül.
+Meglévő magyar felirat mellé nem készül újabb magyar sáv. Felirat nélküli
+videóhoz nem készít beszédfelismerést. Több hangsáv esetén az új opció
+elérhetősége a kiválasztott hangsáv feliratlistájától is függ.
 
-Ha a válasz külön `translationLanguages` listát is tartalmaz, abba is
-bekerül a magyar nyelv. A TV-kliensek ezt nem feltétlenül használják:
-a közvetlen magyar feliratsáv az asztali Auto-translate almenü nélküli
-felületekhez is készült. A megközelítés előzménye az upstream
-[#472 PR](https://github.com/webosbrew/youtube-webos/pull/472).
+## A kód működése
 
-## Ellenőrzések és korlátok
+A meglévő JSON.parse hook mögé kapcsolódva a player-válasz fordítható
+feliratsávjából készít magyar sávot, a timedtext címhez adott tlang=hu
+paraméterrel. Az eredeti forrásnyelv és a hitelesítési paraméterek megmaradnak.
+Az új sáv indexe a kapcsolódó hangsávok feliratlistájába is bekerül.
+Ha van translationLanguages lista, a magyar nyelv abba is bekerül.
+
+A megközelítés előzménye az upstream [#472 PR](https://github.com/webosbrew/youtube-webos/pull/472).
+A kód és az eredeti tesztek a korábban működő magyar fordításra épülnek;
+a későbbi automatikus kapcsolási kísérletek nem részei a jelenlegi forrásnak.
+
+## Fejlesztés és ellenőrzés
+
+Használd a package.json által előírt Node.js és pnpm verziót.
 
 ```sh
+pnpm install --frozen-lockfile --public-hoist-pattern=@babel/runtime
 pnpm run test:subtitles
 pnpm run lint:all
-pnpm run build:dev
-pnpm run test:compat
 pnpm run build
 pnpm run test:compat
 pnpm run package
 ```
 
-A célzott tesztek a válaszadatok módosítását, a fordítási URL-t, a hangsávok
-indexeit, a meglévő magyar felirat megőrzését és a parse-hook együttműködését
-ellenőrzik. Nem kérnek élő YouTube-fordítást.
+A csomagolás a projekt gyökerében hozza létre az IPK-t; ezt a .gitignore
+kizárja a véletlen commitolásból. A downloads mappában egyetlen aktuális
+telepítő és a hozzá tartozó SHA-256 ellenőrzőösszeg marad.
+A helyi tesztek nem kérnek élő YouTube-fordítást, ezért új verziónál a magyar
+szöveg megjelenését, az időzítést és a kézi CC-kapcsolást a tévén is ellenőrizni kell.
 
-A sikeres build és a magyar menüpont önmagában nem bizonyítja a fordítás
-működését. A YouTube szerverének tényleges válaszát és a tévén megjelenő
-szöveget külön kell ellenőrizni. A fejlesztés felhőkörnyezetében a YouTube
-elérését a hálózati proxy 403-mal blokkolta, LG tévé pedig nem volt csatlakoztatva.
-A korábbi kézi magyar fordítást a felhasználó már működőként visszaigazolta
-a tévén. Ez a változat ugyanazt a feliratfordítási algoritmust használja.
+## Későbbi frissítések
 
-A kiegészítő Chromium-próba sem adott eredményt: ebben a környezetben már
-egy üres tesztoldal megnyitása is időtúllépéssel végződött. A böngészős
-integrációs ellenőrzés ezért nincs sikeresként elszámolva.
+A main az egyetlen aktív ág. Új eredeti kliensverziónál a webosbrew/youtube-webos
+változtatásait ebből kiindulva, külön ideiglenes fejlesztői ágon kell beemelni,
+a működő magyar fordítás megtartásával. Új klónozás általában nem szükséges.
+Az ellenőrzések és a TV-s próba után a frissítés beolvasztható a main ágba;
+az ideiglenes ág törölhető, a downloads telepítője pedig lecserélhető az újra.
 
-Ha a magyar opció látható, de nincs szöveg, a TV DevTools Network paneljén
-ellenőrizhető a `timedtext` kérés: szerepel-e benne `tlang=hu`, milyen a
-státuszkód, illetve tartalmaz-e a válasz magyar szöveget és időzítést.
-A HTTP 200 üres válasszal nem sikeres feliratteszt.
-Az upstream [#306 hibajegy](https://github.com/webosbrew/youtube-webos/issues/306)
-hasonló, látható opció melletti fordítási hibáról számol be.
-
-Hibajelzéshez a videóazonosító, a kapcsoló állapota, a menüben látott név,
-a státuszkód és a tévén tapasztalt viselkedés hasznos. Cookie-t, tokent vagy
-teljes, aláírt felirat-URL-t ne ossz meg. A modul saját naplója nem írja ki
-ezeket az URL-eket.
+A korábbi kísérletek a Git-előzményekben megmaradnak, de nincsenek benne
+az aktuális fájlkészletben. Hibajelzéshez a videóazonosító és a tapasztalt
+viselkedés elegendő kiindulás; cookie-t, tokent vagy aláírt felirat-URL-t ne ossz meg.
