@@ -15,7 +15,7 @@ document.addEventListener(
 import './app_api/index';
 import './adblock.js';
 import './subtitles';
-import './auto-subtitles';
+import './manual-caption-diagnostics';
 import './hooks/json-stringify';
 import './shorts.js';
 import './sponsorblock.js';

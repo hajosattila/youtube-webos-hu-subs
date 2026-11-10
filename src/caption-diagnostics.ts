@@ -12,10 +12,15 @@ const FIELDS = [
   'id',
   'code',
   'enabled',
-  'audioIsDefault'
+  'audioIsDefault',
+  'vssId',
+  'vss_id',
+  'kind',
+  'translationLanguage',
+  'track'
 ];
 
-function summarize(value: unknown, depth = 0): string {
+export function summarizeCaptionValue(value: unknown, depth = 0): string {
   if (value === null || value === undefined) return String(value);
   if (typeof value === 'boolean') return String(value);
   if (typeof value === 'number')
@@ -24,7 +29,7 @@ function summarize(value: unknown, depth = 0): string {
       : 'number';
   if (typeof value === 'string') {
     // Only short locale/track IDs are displayed. Never dump arbitrary strings.
-    return /^(?:[a-z]{2,3}(?:[_-][a-z0-9]{1,8})*(?:\.\d+)?|\d{1,3})$/i.test(
+    return /^(?:\.?[a-z]{2,3}(?:[_-][a-z0-9]{1,8})*(?:\.\d+)?|[a-z]\.[a-z]{2,3}(?:-[a-z0-9]{1,8})*|\d{1,3})$/i.test(
       value
     )
       ? value
@@ -35,7 +40,7 @@ function summarize(value: unknown, depth = 0): string {
   if (Array.isArray(value))
     return `list(${value.length})[${value
       .slice(0, 3)
-      .map((item) => summarize(item, depth + 1))
+      .map((item) => summarizeCaptionValue(item, depth + 1))
       .join(';')}]`;
   // Read own data properties only: getters and unknown fields may contain secrets.
   const descriptors = Object.getOwnPropertyDescriptors(value);
@@ -45,13 +50,15 @@ function summarize(value: unknown, depth = 0): string {
   const values = FIELDS.flatMap((field) => {
     const property = descriptors[field];
     return property && 'value' in property
-      ? [`${field}=${summarize(property.value, depth + 1)}`]
+      ? [`${field}=${summarizeCaptionValue(property.value, depth + 1)}`]
       : [];
   });
   return values.length
     ? `{${values.join(',')}}`
     : `keys(${keys.slice(0, 8).join(',')})`;
 }
+
+const summarize = summarizeCaptionValue;
 
 export function captionDiagnostics(
   player: unknown,

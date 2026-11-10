@@ -119,6 +119,26 @@ a `CC-TV` és `CC-OPT` a feliratlisták szűrt adatait, a `CC-ON` a CC állapot�
 Az alkalmazásba visszatéréskor az alapbeállítás újra alkalmazható ugyanazon
 videón is. A D3 továbbra is diagnosztikai tesztváltozat; nem igazolt TV-s javítás.
 
+## CC-művelet megfigyelése / 0.5.5
+
+A D3 képen a natív hangsáv `eng`, a CC-állapot `true`, a kiválasztott sáv
+pedig `hu` volt, mégsem jelent meg szöveg. A felhasználó visszaigazolta,
+hogy a kézi CC-gomb egyszeri megnyomása továbbra is megjeleníti a magyar
+feliratot. Ezek alapján a vezérlési állapotok önmagukban nem igazolják a
+működő feliratmegjelenítést.
+
+A `hu-cc-trace` csomagban ezért az automatika nem fut. A kézi CC-művelet
+előtti és utáni állapotot, valamint a hozzá kapcsolódó publikus lejátszóhívásokat
+figyeli. Nem módosítja a hívások argumentumait, visszatérési értékét vagy
+hibáit. Csak szűrt nyelvi/sávazonosítókat és állapotokat tárol a memóriában;
+nem küld adatot hálózaton, és nem másol tokent vagy felirat-URL-t a kijelzésbe.
+
+Telepítés és teljes újraindítás után indíts el egy angol videót. A
+`HU CC TRACE – 0.5.5` blokk megjelenése után nyomd meg egyszer a kézi CC-t,
+várj két másodpercet, majd fotózd le a frissült blokkot. A panel felül van,
+hogy az alul megjelenő tényleges feliratot is ellenőrizni lehessen.
+Ez diagnosztikai csomag, nem kész automatikus feliratjavítás.
+
 ## Mit módosít a kód?
 
 A meglévő `JSON.parse` hook mögé kapcsolódva a YouTube player-válaszában
