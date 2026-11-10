@@ -1,12 +1,19 @@
 import { AutomaticCaptions, type CaptionPlayer } from './automatic-captions';
 import { getPlayerManager, PlayerMode } from './player_api';
 import { showNotification } from './ui';
+import { captionDiagnostics } from './caption-diagnostics';
 
 getPlayerManager()
   .then((manager) => {
     const automatic = new AutomaticCaptions((message) => {
       console.warn('[subtitles]', message);
-      showNotification(`Automatikus felirat: ${message}`, 10000);
+      if (message.startsWith('A1:')) {
+        const diagnosis = captionDiagnostics(manager.player);
+        console.info('[subtitles]', diagnosis);
+        showNotification(diagnosis, 60000);
+      } else {
+        showNotification(`Automatikus felirat: ${message}`, 10000);
+      }
     });
     const update = () => {
       if (manager.playerMode !== PlayerMode.NORMAL) return;

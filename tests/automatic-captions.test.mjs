@@ -2,6 +2,64 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { audioLanguage, AutomaticCaptions } from '../src/automatic-captions.ts';
 import { addHungarianSubtitles } from '../src/subtitle-tracks.ts';
+import { captionDiagnostics } from '../src/caption-diagnostics.ts';
+
+test('audio diagnostics show API availability and actual locale fields', () => {
+  const summary = captionDiagnostics({
+    getAudioTrack: () => ({ language: 'en', id: 'en.0' }),
+    getAvailableAudioTracks: () => [{ languageInfo: { id: 'hu' } }]
+  });
+  assert.match(summary, /getAudioTrack:1/);
+  assert.match(summary, /getOption:0/);
+  assert.match(summary, /language=en/);
+  assert.match(summary, /id=en\.0/);
+  assert.match(summary, /L=.*id=hu/);
+});
+
+test('audio diagnostics never print arbitrary values, URLs or credential fields', () => {
+  const summary = captionDiagnostics({
+    getAudioTrack: () => ({
+      languageCode: 'https://example.com/?token=private-token',
+      token: 'private-token',
+      auth: 'private-auth',
+      languageInfo: { id: 'hu', token: 'private-inner' }
+    }),
+    getVideoData: () => ({ title: 'private-title', author: 'private-author' }),
+    getPlayerResponse: () => ({
+      streamingData: {
+        adaptiveFormats: [
+          {
+            url: 'https://example.com/private-media',
+            audioTrack: { id: 'en.0', token: 'private-token' }
+          }
+        ]
+      }
+    })
+  });
+  assert.doesNotMatch(summary, /https:|private-/);
+  assert.match(summary, /id=hu/);
+});
+
+test('audio diagnostics do not invoke getters on returned track objects', () => {
+  const track = {};
+  Object.defineProperty(track, 'language', {
+    get() {
+      throw new Error('secret getter');
+    }
+  });
+  assert.doesNotThrow(() => captionDiagnostics({ getAudioTrack: () => track }));
+});
+
+test('audio diagnostics tolerate missing and throwing player APIs', () => {
+  assert.doesNotThrow(() =>
+    captionDiagnostics({
+      getAudioTrack() {
+        throw new Error('secret');
+      }
+    })
+  );
+  assert.equal(captionDiagnostics(null), 'DIAG: no player');
+});
 
 function fixture() {
   const hu = { languageCode: 'hu', vss_id: '.hu', displayName: 'Magyar' };

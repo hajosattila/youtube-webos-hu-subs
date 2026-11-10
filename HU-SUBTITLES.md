@@ -64,6 +64,22 @@ fordítható sávokat sem használja. Több hangsáv esetén az alapértelmezett
 hangsáv feliratforrását részesíti előnyben, és csak az ehhez a forráshoz
 kapcsolódó feliratlistákat bővíti; más hangsávra váltva az új opció hiányozhat.
 
+## A1 diagnosztikai tesztváltozat
+
+Ha az automatikus felirat az A1 ponton áll meg, a `hu-auto-diag` csomag egy
+percig megjeleníti a `DIAG A1` adatblokkot. Nyiss meg egy angol videót, várj
+körülbelül 12 másodpercet, és fotózd le ezt a blokkot. Ez adatgyűjtési
+tesztváltozat: az A1 hibát még nem javítja, és nem helyettesíti az ismeretlen
+hangsávnyelvet feltételezett angollal.
+
+Az 1/0 jelzések a kiolvasó függvények elérhetőségét mutatják. Az A/O/L/V
+sorok a hangsáv, az opció, az elérhető hangsávok és a videóadatok
+szűrt szerkezetét írják le. Az RA/RC sorok a lejátszóválasz hangadatait
+foglalják össze. Az alkalmazás nem továbbítja ezt az adatot sehova.
+Csak rövid nyelvi azonosítók, mezőnevek és állapotjelzők jelenhetnek meg;
+a tokenek, URL-ek, videócímek és más tetszőleges szöveges értékek kimaradnak.
+A kód nem változtatja meg a hangsávot, a menüt vagy a felirat formázását.
+
 ## Mit módosít a kód?
 
 A meglévő `JSON.parse` hook mögé kapcsolódva a YouTube player-válaszában
