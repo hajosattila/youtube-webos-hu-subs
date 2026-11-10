@@ -10,17 +10,35 @@ Nem tartalmaz DeepL-integrációt vagy új külső függőséget.
    háttérben maradt, az új kód még nem feltétlenül töltődött be.
 3. Nyiss meg egy olyan videót, amelyhez van működő, fordítható felirat,
    például angol automatikusan generált felirat.
-4. A videó YouTube-feliratmenüjében keresd a
-   **Magyar (automatikus fordítás)** lehetőséget, és válaszd ki.
-   A TV felületétől függően a lista megjelenítése eltérhet.
+4. Idegen (például angol) hangsáv esetén a magyar feliratnak automatikusan
+   be kell kapcsolódnia, ha van elérhető magyar feliratsáv.
 5. Ellenőrizd, hogy magyar szöveg jelenik meg, és a videóhoz igazodik.
    Próbáld ki az előre/hátra tekerést és egy másik videót is.
 
-A funkció alapból engedélyezett, de nem választja ki automatikusan a magyar
-feliratot. A zöld gombbal megnyitható alkalmazásmenüben az
-**Add Hungarian auto-translated subtitles (reopen video)** kapcsolóval
-kikapcsolható. A kapcsoló átállítása után nyisd meg újra a videót, hogy új
-lejátszóválasz töltődjön be.
+A magyar fordítás felkínálása állandóan engedélyezett. A zöld gombos
+alkalmazásmenüből eltűnt a külön magyar feliratkapcsoló. A régebbi verzióban
+elmentett kapcsolóállapotot az új verzió nem használja.
+
+Új videó indulásakor és a kiválasztott hangsáv nyelvének váltásakor:
+
+- Magyar hang esetén alapból kikapcsolja a feliratot.
+- Idegen hang esetén az elérhető magyar feliratot választja ki.
+- Ismeretlen nyelv esetén nem avatkozik be. Nem következtet a videócím vagy
+  a feliratok nyelvéből, és nem változtatja meg a hangsávot.
+
+A kezdeti beállítás után a kézi feliratválasztás elsőbbséget kap: az
+automatika nem kapcsolgatja vissza a kézzel ki- vagy bekapcsolt feliratot.
+A következő videónál vagy más nyelvű hangsávra váltáskor új alapbeállítás
+érvényesül. A betűméretet, színt, hátteret és egyéb formázást nem módosítja.
+
+Az automatika a YouTube-lejátszó meglévő hangsáv- és feliratkezelő függvényeit
+használja. Ha ezek hiányoznak vagy nem adnak nyelvi adatot, megmarad a kézi
+feliratválasztás lehetősége. A később betöltődő feliratlistára legfeljebb
+körülbelül 12 másodpercig vár. Felirat nélküli videón nem készít beszédfelismerést.
+
+TV-s ellenőrzéshez próbálj egymás után angol, magyar, majd ismét angol
+hangú videót. Ellenőrizd a kézi feliratkapcsolás megtartását is ugyanazon
+videón belül, és ha van rá lehetőség, a hangsáv nyelvének váltását.
 
 Meglévő magyar feliratsáv mellé nem kerül újabb magyar sáv. Felirat nélküli
 videóhoz a funkció nem készít beszédfelismerést, és a kifejezetten nem
@@ -33,8 +51,8 @@ kapcsolódó feliratlistákat bővíti; más hangsávra váltva az új opció hi
 A meglévő `JSON.parse` hook mögé kapcsolódva a YouTube player-válaszában
 keres fordítható feliratsávot. A meglévő sáv címét `tlang=hu` célnyelvvel
 használja fel egy új, magyar sávhoz. Az eredeti forrásnyelv és a kérés
-hitelesítési paraméterei megmaradnak; az eredeti sáv és az alapértelmezett
-feliratválasztás nem változik. Az új sáv indexe a hozzá tartozó hangsávok
+hitelesítési paraméterei megmaradnak; az eredeti sáv nem változik.
+Az új sáv indexe a hozzá tartozó hangsávok
 feliratlistáiba is bekerül.
 
 Ha a válasz külön `translationLanguages` listát is tartalmaz, abba is
@@ -57,17 +75,16 @@ pnpm run package
 
 A célzott tesztek a válaszadatok módosítását, a fordítási URL-t, a hangsávok
 indexeit, a meglévő magyar felirat megőrzését és a parse-hook együttműködését
-ellenőrzik. Nem kérnek élő YouTube-fordítást.
+ellenőrzik. Az automatika tesztjei a magyar és idegen hangot, a videó- és
+hangsávváltást, a későn érkező adatokat és a kézi választás megtartását is
+vizsgálják. Nem kérnek élő YouTube-fordítást.
 
 A sikeres build és a magyar menüpont önmagában nem bizonyítja a fordítás
 működését. A YouTube szerverének tényleges válaszát és a tévén megjelenő
 szöveget külön kell ellenőrizni. A fejlesztés felhőkörnyezetében a YouTube
 elérését a hálózati proxy 403-mal blokkolta, LG tévé pedig nem volt csatlakoztatva.
-Ezért ez a kiadás TV-n ellenőrizendő tesztváltozat.
-
-A kiegészítő Chromium-próba sem adott eredményt: ebben a környezetben már
-egy üres tesztoldal megnyitása is időtúllépéssel végződött. A böngészős
-integrációs ellenőrzés ezért nincs sikeresként elszámolva.
+A korábbi, kézzel választható magyar fordítást a felhasználó már működőként
+visszaigazolta a tévén. Az új automatikus kiválasztás még TV-n ellenőrizendő.
 
 Ha a magyar opció látható, de nincs szöveg, a TV DevTools Network paneljén
 ellenőrizhető a `timedtext` kérés: szerepel-e benne `tlang=hu`, milyen a
@@ -76,7 +93,7 @@ A HTTP 200 üres válasszal nem sikeres feliratteszt.
 Az upstream [#306 hibajegy](https://github.com/webosbrew/youtube-webos/issues/306)
 hasonló, látható opció melletti fordítási hibáról számol be.
 
-Hibajelzéshez a videóazonosító, a kapcsoló állapota, a menüben látott név,
+Hibajelzéshez a videóazonosító, a kiválasztott hangsáv nyelve, a menüben látott név,
 a státuszkód és a tévén tapasztalt viselkedés hasznos. Cookie-t, tokent vagy
 teljes, aláírt felirat-URL-t ne ossz meg. A modul saját naplója nem írja ki
 ezeket az URL-eket.
