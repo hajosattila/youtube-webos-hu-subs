@@ -42,6 +42,45 @@ function canRecover(status: number) {
   return (status >= 200 && status < 300) || status === 404 || status === 429;
 }
 
+function originalCaptionRequest(resource: string) {
+  const url = timedTextUrl(resource);
+  return url &&
+    url.searchParams.get('v') &&
+    !url.searchParams.has('tlang') &&
+    url.searchParams.get('variant') !== 'timing-optimized'
+    ? url
+    : null;
+}
+
+function sameTrack(first: URL, second: URL) {
+  return TRACK_KEYS.every(
+    (key) => first.searchParams.get(key) === second.searchParams.get(key)
+  );
+}
+
+function sameRequest(first: URL, second: URL) {
+  const query = (url: URL) => {
+    const params = new URLSearchParams(url.search);
+    params.delete('tlang');
+    params.sort();
+    return params.toString();
+  };
+  return query(first) === query(second);
+}
+
+function xhrCaptionBody(xhr: XMLHttpRequest) {
+  if (xhr.status >= 300) return '';
+  if (xhr.responseType === 'json')
+    return xhr.response ? JSON.stringify(xhr.response) : '';
+  if (xhr.responseType === '' || xhr.responseType === 'document') {
+    if (xhr.responseXML)
+      return new XMLSerializer().serializeToString(xhr.responseXML);
+  }
+  return xhr.responseType === '' || xhr.responseType === 'text'
+    ? xhr.responseText
+    : '';
+}
+
 async function withTimeout<T>(
   request: (signal: AbortSignal | undefined) => Promise<T | null>,
   milliseconds: number,
@@ -74,6 +113,24 @@ async function withTimeout<T>(
 
 export function createCaptionRecovery() {
   const videos = new Map<string, CaptionSources>();
+  const workingRequests = new Map<string, URL>();
+
+  function recordOriginal(url: URL, body: string) {
+    const video = url.searchParams.get('v');
+    if (!video || !hasCaptionText(body)) return;
+    if (
+      videos
+        .get(video)
+        ?.some(({ url: source, dubbed }) => dubbed && sameTrack(source, url))
+    )
+      return;
+    workingRequests.delete(video);
+    workingRequests.set(video, url);
+    if (workingRequests.size > 8) {
+      const oldest = workingRequests.keys().next().value;
+      if (oldest !== undefined) workingRequests.delete(oldest);
+    }
+  }
 
   function register(sources: CaptionSources) {
     const video = sources[0]?.url.searchParams.get('v');
@@ -126,13 +183,27 @@ export function createCaptionRecovery() {
     };
 
     const alternates = new Set<string>();
+    // The actual successful player request includes runtime parameters that
+    // may be absent from the base URL in the player response.
+    const working = workingRequests.get(video);
+    if (
+      working &&
+      working.origin === request.origin &&
+      sameTrack(working, request) &&
+      ['fmt', 'sq'].every(
+        (key) => working.searchParams.get(key) === request.searchParams.get(key)
+      ) &&
+      ['c', 'cver', 'ei'].every((key) => {
+        const value = request.searchParams.get(key);
+        return !value || working.searchParams.get(key) === value;
+      }) &&
+      !sameRequest(working, request)
+    ) {
+      alternates.add(withTimedTextParams(working, { tlang: 'hu' }));
+    }
+
     for (const { url } of available ?? []) {
-      if (
-        TRACK_KEYS.every(
-          (key) => url.searchParams.get(key) === request.searchParams.get(key)
-        )
-      )
-        continue;
+      if (sameTrack(url, request)) continue;
       const translated = getUrl(url, 'hu');
       if (translated) alternates.add(translated);
       if (alternates.size === 2) break;
@@ -229,7 +300,7 @@ export function createCaptionRecovery() {
     return result;
   }
 
-  return { register, plan, recover };
+  return { register, recordOriginal, plan, recover };
 }
 
 export function installCaptionRecovery(
@@ -260,8 +331,21 @@ export function installCaptionRecovery(
     const request = resource instanceof Request ? resource : null;
     const url = request?.url ?? String(resource);
     const method = init?.method ?? request?.method ?? 'GET';
-    const plan = method.toUpperCase() === 'GET' ? recovery.plan(url) : null;
-    if (!plan) return originalFetch(resource, init);
+    if (method.toUpperCase() !== 'GET') return originalFetch(resource, init);
+    const plan = recovery.plan(url);
+    if (!plan) {
+      const original = originalCaptionRequest(url);
+      if (!original) return originalFetch(resource, init);
+      const response = await fetchWithoutXhr(resource, init);
+      if (response.ok) {
+        try {
+          recovery.recordOriginal(original, await response.clone().text());
+        } catch {
+          // The original response remains available to the player.
+        }
+      }
+      return response;
+    }
     const response = await fetchWithoutXhr(resource, init);
     if (!canRecover(response.status)) return response;
 
@@ -333,14 +417,27 @@ export function installCaptionRecovery(
     active.get(this)?.reset();
     const [method, url, async = true, username, password] = args;
     const resource = String(url);
-    const plan =
+    const observe =
       async &&
       !username &&
       !password &&
       method.toUpperCase() === 'GET' &&
-      !fetchRequests.has(resource)
-        ? recovery.plan(resource)
-        : null;
+      !fetchRequests.has(resource);
+    const plan = observe ? recovery.plan(resource) : null;
+    const original = observe && !plan ? originalCaptionRequest(resource) : null;
+    if (original) {
+      const xhr = this;
+      const reset = () => active.delete(xhr);
+      active.set(xhr, {
+        reset,
+        onComplete(event) {
+          if (event.type !== 'readystatechange' || xhr.readyState !== 4) return;
+          reset();
+          if (xhr.status >= 200 && xhr.status < 300)
+            recovery.recordOriginal(original, xhrCaptionBody(xhr));
+        }
+      });
+    }
     if (plan) {
       const recoveryPlan = plan;
       const xhr = this;
@@ -382,14 +479,7 @@ export function installCaptionRecovery(
         const isXml =
           responseType === 'document' ||
           (responseType === '' && xhr.responseXML !== null);
-        let body = '';
-        if (xhr.status < 300) {
-          if (responseType === 'json')
-            body = xhr.response ? JSON.stringify(xhr.response) : '';
-          else if (isXml && xhr.responseXML)
-            body = new XMLSerializer().serializeToString(xhr.responseXML);
-          else if (responseType !== 'document') body = xhr.responseText;
-        }
+        const body = xhrCaptionBody(xhr);
         if (hasCaptionText(body)) {
           console.info('[subtitles] YouTube returned Hungarian captions');
           reset();

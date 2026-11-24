@@ -439,6 +439,47 @@ const ENGLISH_CAPTIONS = {
   ]
 };
 
+test('reuses the successful player request with its runtime parameters intact', async () => {
+  const recovery = createCaptionRecovery();
+  const playerUrl = SOURCE_URL + '&xorb=2&xobt=3&c=TVHTML5&ei=test-session';
+  const requestedHu = SOURCE_URL + '&c=TVHTML5&ei=test-session&tlang=hu';
+  const replay = playerUrl + '&tlang=hu';
+  const requests = [];
+  const transport = {
+    XMLHttpRequest: class {
+      open() {}
+      abort() {}
+    },
+    async fetch(url) {
+      requests.push(url);
+      if (url === playerUrl) return Response.json(ENGLISH_CAPTIONS);
+      if (url === requestedHu) return Response.json({ events: [] });
+      assert.equal(url, replay);
+      return Response.json({ events: [{ segs: [{ utf8: 'Jó reggelt!' }] }] });
+    }
+  };
+
+  installCaptionRecovery(recovery, transport);
+  assert.deepEqual(
+    await (await transport.fetch(playerUrl)).json(),
+    ENGLISH_CAPTIONS
+  );
+  const translated = await (await transport.fetch(requestedHu)).json();
+  assert.equal(translated.events[0].segs[0].utf8, 'Jó reggelt!');
+  assert.deepEqual(requests, [playerUrl, requestedHu, replay]);
+
+  assert.deepEqual(recovery.plan(replay).alternates, []);
+  assert.deepEqual(
+    recovery.plan(requestedHu.replace('test-session', 'other-session'))
+      .alternates,
+    []
+  );
+  assert.deepEqual(
+    recovery.plan(requestedHu.replace('fmt=json3', 'fmt=vtt')).alternates,
+    []
+  );
+});
+
 test('uses an alternate original ASR source after an empty native translation', async () => {
   const recovery = createCaptionRecovery();
   addHungarianSubtitles(response(), recovery.register);

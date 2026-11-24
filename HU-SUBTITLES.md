@@ -29,9 +29,11 @@ adott magyar sáv ugyanezt a fordítást kéri a timedtext címhez fűzött
 paraméterek kódolása megmarad. Az új sáv indexe a kapcsolódó hangsávok
 feliratlistájába kerül.
 
-Üres magyar válasz esetén az alkalmazás legfeljebb két másik forrássávból próbál
-magyar fordítást kérni a YouTube-tól. Előnyben részesíti az eredeti hangsáv
-automatikus átiratát. Ha egyik kérés sem ad szöveget,
+Üres magyar válasz esetén az alkalmazás először egy már sikeres kérésből próbál
+új fordítást kérni a YouTube-tól, ha van ilyen ugyanahhoz a feliratsávhoz és
+lejátszási munkamenethez. Ebben csak a célnyelvet módosítja. Összesen legfeljebb
+két új YouTube-kérést küld, előnyben részesítve az eredeti hangsáv automatikus
+átiratát. Ha egyik kérés sem ad szöveget,
 az eredeti felirat szövegét a Google Fordítóval fordítja le. A Google Fordító
 felé csak feliratszöveg kerül, a videóazonosító, az aláírt feliratcím és a
 YouTube-sütik továbbítása nélkül. A felirat időzítése megmarad.
