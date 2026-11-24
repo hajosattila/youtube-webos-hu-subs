@@ -152,7 +152,7 @@ test('prefers the default audio and only extends audio menus using that source',
   );
   assert.deepEqual(
     result.audioTracks.map((audio) => audio.captionTrackIndices),
-    [[0], [1, 2], [0, 1, 2]]
+    [[0], [1, 2], [0, 2, 1]]
   );
   assert.deepEqual(
     result.audioTracks.map((audio) => audio.defaultCaptionTrackIndex),

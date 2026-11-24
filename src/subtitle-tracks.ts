@@ -176,7 +176,12 @@ function translateTracklist(
       audio.captionTrackIndices.includes(source.index)
         ? {
             ...audio,
-            captionTrackIndices: [...audio.captionTrackIndices, tracks.length]
+            // Keep the first track in place for players that use it by default.
+            captionTrackIndices: [
+              audio.captionTrackIndices[0],
+              tracks.length,
+              ...audio.captionTrackIndices.slice(1)
+            ]
           }
         : audio
     );

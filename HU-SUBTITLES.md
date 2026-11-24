@@ -12,7 +12,7 @@ Az alkalmazás a YouTube feliratmenüjét és a lejátszó feliratmegjelenítés
 1. Töltsd le az [aktuális, 0.5.3-as IPK-t](https://github.com/hajosattila/youtube-webos-hu-subs/raw/refs/heads/main/downloads/youtube.leanback.v4_0.5.3_all-hu.ipk).
 2. Telepítsd a webOS Dev Managerrel, majd teljesen zárd be és indítsd újra az alkalmazást.
 3. Nyiss meg egy működő, fordítható felirattal rendelkező videót.
-4. A feliratok fő listájában válaszd a **Magyar (automatikus fordítás)** sávot. A YouTube a **Magyar** opciót az **Automatikus fordítás** almenüben is megkaphatja.
+4. A feliratok fő listájában keresd a **Magyar (automatikus fordítás)** sávot az első meglévő feliratsáv után. A **Magyar** opció az **Automatikus fordítás** almenüben is elérhető, ha a YouTube megjeleníti az almenüt.
 5. A CC gombbal kézzel ki- és bekapcsolhatod a feliratot.
 
 Meglévő magyar felirat mellé nem készül újabb magyar sáv. Felirat nélküli
