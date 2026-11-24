@@ -1,4 +1,4 @@
-# YouTube Ad-Free magyar felirattal LG webOS-re
+# YouTube Ad-Free kliens LG webOS-re, magyar automatikus feliratfordítással.
 
 A [webosbrew/youtube-webos](https://github.com/webosbrew/youtube-webos) magyar feliratos változata LG webOS tévékre. Az eredeti alkalmazás reklámblokkolását, SponsorBlock-támogatását és lejátszási beállításait egészíti ki.
 
