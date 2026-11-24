@@ -8,7 +8,7 @@ if (!outfile) throw new Error('Usage: gen-manifest <outfile>');
 
 const appinfo = require('../assets/appinfo.json');
 const pkgJson = require('../package.json');
-const ipkfile = `${appinfo.id}_${pkgJson.version}_all.ipk`;
+const ipkfile = `${appinfo.id}_${pkgJson.version}_all-hu.ipk`;
 const ipkhash = crypto
   .createHash('sha256')
   .update(fs.readFileSync(ipkfile))
@@ -24,7 +24,7 @@ fs.writeFileSync(
     // appDescription: appinfo.appDescription,
     iconUri:
       'https://raw.githubusercontent.com/webosbrew/youtube-webos/main/assets/largeIcon.png',
-    sourceUrl: 'https://github.com/webosbrew/youtube-webos',
+    sourceUrl: 'https://github.com/hajosattila/youtube-webos-hu-subs',
     rootRequired: false,
     ipkUrl: ipkfile,
     ipkHash: {

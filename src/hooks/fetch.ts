@@ -54,20 +54,28 @@ export class FetchRegistry extends CustomEventTarget<EventMap> {
   }
 
   #customFetch = async (resource: FetchTarget, init?: RequestInit) => {
-    if (window.__ytaf_debug__) {
-      console.debug(`Request ${this.#fetchCount}:`, resource);
-      init && console.debug(`Options  ${this.#fetchCount}:`, init);
-
-      if (resource instanceof Request) {
-        const reqBody = await FetchRegistry.#dumpBody(resource);
-        reqBody && console.debug(`Request Body ${this.#fetchCount}:`, reqBody);
-      }
-    }
-
     const url = new URL(
       resource instanceof Request ? resource.url : resource.toString(),
       document.location.href
     );
+    const sensitive =
+      url.pathname === '/api/timedtext' ||
+      url.hostname === 'translate.googleapis.com';
+    if (window.__ytaf_debug__) {
+      if (sensitive) {
+        console.debug(`Caption request ${this.#fetchCount} (details hidden)`);
+      } else {
+        console.debug(`Request ${this.#fetchCount}:`, resource);
+        init && console.debug(`Options  ${this.#fetchCount}:`, init);
+
+        if (resource instanceof Request) {
+          const reqBody = await FetchRegistry.#dumpBody(resource);
+          reqBody &&
+            console.debug(`Request Body ${this.#fetchCount}:`, reqBody);
+        }
+      }
+    }
+
     const reqAllowed = this.dispatchEvent(
       new TypedCustomEvent('request', {
         detail: { url, resource, init },
@@ -77,8 +85,7 @@ export class FetchRegistry extends CustomEventTarget<EventMap> {
     if (!reqAllowed) {
       console.info(
         `Fetch request ${this.#fetchCount} was cancelled by listener.`,
-        resource,
-        init
+        ...(sensitive ? [] : [resource, init])
       );
       throw new TypeError('Failed to fetch');
     }
@@ -86,7 +93,7 @@ export class FetchRegistry extends CustomEventTarget<EventMap> {
     // @ts-expect-error
     const res = await this.#originalFetch(resource, init);
 
-    if (window.__ytaf_debug__) {
+    if (window.__ytaf_debug__ && !sensitive) {
       console.debug(`Response ${this.#fetchCount}:`, res);
 
       const resBody = await FetchRegistry.#dumpBody(res);
@@ -100,7 +107,7 @@ export class FetchRegistry extends CustomEventTarget<EventMap> {
     if (!resAllowed) {
       console.info(
         `Fetch response ${this.#fetchCount} was cancelled by listener.`,
-        res
+        ...(sensitive ? [] : [res])
       );
       throw new TypeError('Failed to fetch');
     }

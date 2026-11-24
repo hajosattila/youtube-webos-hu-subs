@@ -1,35 +1,48 @@
-name: Build & Release
+name: Publish Hungarian release
 
 on:
   push:
-    branches:
-      - '!*'
     tags:
-      - 'v*.*'
+      - 'v*-hu'
 
 jobs:
-  build-and-release:
+  release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-env
-
-      - run: pnpm run build
-      - run: pnpm run package
-      - run: pnpm run manifest
-
-      - name: Create release
-        uses: ncipollo/release-action@v1
+      - uses: actions/setup-node@v4
         with:
-          name: 'Release ${{ github.ref }}'
-          prerelease: true
-          draft: false
-          allowUpdates: true
-          omitNameDuringUpdate: true
-          omitBodyDuringUpdate: true
-          omitDraftDuringUpdate: true
-          omitPrereleaseDuringUpdate: true
-          artifacts: '*.ipk,*.manifest.json'
+          node-version: 'lts/*'
+
+      - name: Publish the verified IPK
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          app_id=$(node -p "require('./assets/appinfo.json').id")
+          package_name="${app_id}_${version}_all-hu.ipk"
+          test "$RELEASE_TAG" = "v${version}-hu"
+          (cd downloads && sha256sum --check "$package_name.sha256")
+
+          cp "downloads/$package_name" .
+          manifest="$app_id.manifest.json"
+          node tools/gen-manifest.cjs "$manifest"
+
+          awk -v heading="## $version magyar feliratos build" '
+            $0 == heading { found = 1; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md > "$RUNNER_TEMP/hu-release-notes.md"
+          test -s "$RUNNER_TEMP/hu-release-notes.md"
+
+          gh release create "$RELEASE_TAG" \
+            "downloads/$package_name" \
+            "downloads/$package_name.sha256" \
+            "$manifest" \
+            --verify-tag \
+            --title "YouTube Ad-Free magyar felirattal – $version" \
+            --notes-file "$RUNNER_TEMP/hu-release-notes.md"
