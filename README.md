@@ -10,10 +10,10 @@ A [webosbrew/youtube-webos](https://github.com/webosbrew/youtube-webos) magyar f
 
 ## Letöltések
 
-- **Telepítő** – [youtube.leanback.v4_0.5.3_all-hu.ipk](downloads/youtube.leanback.v4_0.5.3_all-hu.ipk?raw=true)
-- **Ellenőrzőösszeg** – [SHA-256](downloads/youtube.leanback.v4_0.5.3_all-hu.ipk.sha256)
-- **Forráskód** – [ZIP letöltése](https://github.com/hajosattila/youtube-webos-hu-subs/archive/e0011952f3acdfc4c9e9e13557cdb2e1a33304e7.zip), [alkalmazáskód](src/) és [buildelési útmutató](HU-SUBTITLES.md#fejlesztés-és-ellenőrzés)
-- **Változásnapló** – [kiadási megjegyzések](CHANGELOG.md)
+- **Telepítő** – [youtube.leanback.v4_0.5.3_all-hu.ipk](https://github.com/hajosattila/youtube-webos-hu-subs/releases/download/v0.5.3-hu/youtube.leanback.v4_0.5.3_all-hu.ipk)
+- **Ellenőrzőösszeg** – [SHA-256](https://github.com/hajosattila/youtube-webos-hu-subs/releases/download/v0.5.3-hu/youtube.leanback.v4_0.5.3_all-hu.ipk.sha256)
+- **Forráskód** – [ZIP letöltése](https://github.com/hajosattila/youtube-webos-hu-subs/archive/refs/tags/v0.5.3-hu.zip), [alkalmazáskód](src/) és [buildelési útmutató](HU-SUBTITLES.md#fejlesztés-és-ellenőrzés)
+- **Kiadás** – [0.5.3 magyar feliratos kiadás](https://github.com/hajosattila/youtube-webos-hu-subs/releases/tag/v0.5.3-hu) és [változásnapló](CHANGELOG.md)
 
 ## Telepítés és használat
 
