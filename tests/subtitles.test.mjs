@@ -75,6 +75,13 @@ test('sets the Hungarian timedtext target while preserving source authorization'
   assert.equal(result.audioTracks[0].defaultCaptionTrackIndex, 0);
 });
 
+test('keeps the signed query encoding in the direct-track fallback', () => {
+  const baseUrl = SOURCE_URL + '&name=English%20CC~&exp=a%2fb';
+  const input = response({ captionTracks: [sourceTrack({ baseUrl })] });
+  const translated = tracklist(addHungarianSubtitles(input)).captionTracks[1];
+  assert.equal(translated.baseUrl, baseUrl + '&tlang=hu');
+});
+
 test('replaces an existing translation target instead of appending duplicates', () => {
   const input = response({
     captionTracks: [sourceTrack({ baseUrl: SOURCE_URL + '&tlang=de&tlang=fr' })]
@@ -145,29 +152,52 @@ test('prefers manual captions over ASR within the same audio menu', () => {
   assert.equal(new URL(translated.baseUrl).searchParams.get('name'), 'manual');
 });
 
-test('adds hu to an existing native translation list, preserving other entries', () => {
+test('uses the native translation menu alongside German and French', () => {
   const languages = [
-    { languageCode: 'de', languageName: { simpleText: 'Deutsch' } }
+    { languageCode: 'de', languageName: { simpleText: 'Deutsch' } },
+    { languageCode: 'fr', languageName: { simpleText: 'Français' } }
   ];
-  const result = tracklist(
-    addHungarianSubtitles(response({ translationLanguages: languages }))
-  );
+  const input = freezeDeep(response({ translationLanguages: languages }));
+  const original = tracklist(input);
+  const result = tracklist(addHungarianSubtitles(input));
   assert.deepEqual(result.translationLanguages, [
     ...languages,
     { languageCode: 'hu', languageName: { simpleText: 'Magyar' } }
   ]);
-  assert.equal(languages.length, 1);
+  assert.equal(result.captionTracks, original.captionTracks);
+  assert.equal(result.audioTracks, original.audioTracks);
 });
 
-test('does not duplicate an existing Hungarian translation language', () => {
-  const languages = [
-    { languageCode: 'hu-HU', languageName: { simpleText: 'Magyar' } }
-  ];
+test('keeps an advertised Hungarian translation without a duplicate track', () => {
+  for (const languageCode of ['hu', 'hu-HU']) {
+    const input = response({
+      translationLanguages: [
+        { languageCode, languageName: { simpleText: 'Magyar' } }
+      ]
+    });
+    assert.equal(addHungarianSubtitles(input), input);
+  }
+});
+
+test('matches the native translation menu label format', () => {
+  const input = response({
+    translationLanguages: [
+      { languageCode: 'fr', languageName: { runs: [{ text: 'Français' }] } }
+    ]
+  });
+  const result = tracklist(addHungarianSubtitles(input));
+  assert.deepEqual(result.translationLanguages[1], {
+    languageCode: 'hu',
+    languageName: { runs: [{ text: 'Magyar' }] }
+  });
+});
+
+test('keeps the manual Hungarian track when the translation menu is empty', () => {
   const result = tracklist(
-    addHungarianSubtitles(response({ translationLanguages: languages }))
+    addHungarianSubtitles(response({ translationLanguages: [] }))
   );
-  assert.equal(result.translationLanguages, languages);
-  assert.equal(result.captionTracks.length, 2);
+  assert.equal(result.captionTracks[1].languageCode, 'hu');
+  assert.deepEqual(result.translationLanguages, []);
 });
 
 test('handles TV responses without translationLanguages or audioTracks', () => {

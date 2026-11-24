@@ -11,10 +11,10 @@ A kézi magyar fordítást a felhasználó már működőként visszaigazolta a 
 
 ## Telepítés és használat
 
-1. Töltsd le az [aktuális, 0.5.6-os IPK-t](https://github.com/hajosattila/youtube-webos-hu-subs/raw/refs/heads/main/downloads/youtube.leanback.v4_0.5.6_all.ipk).
+1. Töltsd le az [aktuális, 0.5.3-as IPK-t](https://github.com/hajosattila/youtube-webos-hu-subs/raw/refs/heads/main/downloads/youtube.leanback.v4_0.5.3_all-hu.ipk).
 2. Telepítsd a webOS Dev Managerrel, majd teljesen zárd be és indítsd újra az alkalmazást.
 3. Nyiss meg egy működő, fordítható felirattal rendelkező videót.
-4. A YouTube feliratmenüjében válaszd a **Magyar (automatikus fordítás)** sávot.
+4. A YouTube feliratmenüjében az **Automatikus fordítás** alatt válaszd a **Magyar** nyelvet. Ha nincs ilyen almenü, válaszd a **Magyar (automatikus fordítás)** sávot.
 5. A CC gombbal kézzel ki- és bekapcsolhatod a feliratot.
 
 Meglévő magyar felirat mellé nem készül újabb magyar sáv. Felirat nélküli
@@ -23,11 +23,13 @@ elérhetősége a kiválasztott hangsáv feliratlistájától is függ.
 
 ## A kód működése
 
-A meglévő JSON.parse hook mögé kapcsolódva a player-válasz fordítható
-feliratsávjából készít magyar sávot, a timedtext címhez adott tlang=hu
-paraméterrel. Az eredeti forrásnyelv és a hitelesítési paraméterek megmaradnak.
-Az új sáv indexe a kapcsolódó hangsávok feliratlistájába is bekerül.
-Ha van translationLanguages lista, a magyar nyelv abba is bekerül.
+A meglévő JSON.parse hook a YouTube fordítási nyelvlistáját szükség esetén
+kiegészíti a magyar nyelvvel. A fordítás lekérését és megjelenítését a
+YouTube lejátszója végzi a kiválasztott forrássávhoz. Ha a válaszban nincs
+használható fordítási nyelvlista, a kód külön magyar sávot ad hozzá a
+timedtext címhez fűzött `tlang=hu` paraméterrel. A forrássáv címében lévő
+paraméterek kódolása megmarad. Az új sáv indexe a kapcsolódó hangsávok
+feliratlistájába kerül.
 
 A megközelítés előzménye az upstream [#472 PR](https://github.com/webosbrew/youtube-webos/pull/472).
 A kód és az eredeti tesztek a korábban működő magyar fordításra épülnek;

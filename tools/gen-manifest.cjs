@@ -8,7 +8,7 @@ if (!outfile) throw new Error('Usage: gen-manifest <outfile>');
 
 const appinfo = require('../assets/appinfo.json');
 const pkgJson = require('../package.json');
-const ipkfile = `${appinfo.id}_${pkgJson.version}_all.ipk`;
+const ipkfile = `${appinfo.id}_${pkgJson.version}_all-hu.ipk`;
 const ipkhash = crypto
   .createHash('sha256')
   .update(fs.readFileSync(ipkfile))

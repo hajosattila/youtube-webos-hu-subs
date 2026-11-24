@@ -26,8 +26,14 @@ function translatedUrl(value: unknown): string | null {
     )
       return null;
 
-    // Keep the source language and all authorization parameters intact.
-    url.searchParams.set('tlang', 'hu');
+    // Keep the original encoding of the signed query parameters.
+    const query = url.search
+      ? url.search
+          .slice(1)
+          .split('&')
+          .filter((part) => !new URLSearchParams(part).has('tlang'))
+      : [];
+    url.search = [...query, 'tlang=hu'].join('&');
     return url.toString();
   } catch {
     return null;
@@ -95,6 +101,35 @@ function translateTracklist(renderer: JsonObject): JsonObject | null {
     findSource(indices, false);
   if (!source) return null;
 
+  // Let the player build the translated request from the selected source when
+  // the native Auto-translate menu is available.
+  const languages = renderer.translationLanguages;
+  if (Array.isArray(languages) && languages.length > 0) {
+    if (
+      languages.some((lang) => isObject(lang) && isHungarian(lang.languageCode))
+    )
+      return null;
+
+    const usesRuns = languages.some(
+      (lang) =>
+        isObject(lang) &&
+        isObject(lang.languageName) &&
+        Array.isArray(lang.languageName.runs)
+    );
+    return {
+      ...renderer,
+      translationLanguages: [
+        ...languages,
+        {
+          languageCode: 'hu',
+          languageName: usesRuns
+            ? { runs: [{ text: 'Magyar' }] }
+            : { simpleText: 'Magyar' }
+        }
+      ]
+    };
+  }
+
   // Only copy caption metadata for the target language. In particular, an
   // Arabic source's rtl flag or an ASR source's kind must not label this track.
   const name =
@@ -127,18 +162,6 @@ function translateTracklist(renderer: JsonObject): JsonObject | null {
           }
         : audio
     );
-  }
-
-  // Some clients expose the native Auto-translate menu as well as captionTracks.
-  const languages = renderer.translationLanguages;
-  if (
-    Array.isArray(languages) &&
-    !languages.some((lang) => isObject(lang) && isHungarian(lang.languageCode))
-  ) {
-    result.translationLanguages = [
-      ...languages,
-      { languageCode: 'hu', languageName: { simpleText: 'Magyar' } }
-    ];
   }
 
   return result;

@@ -35,7 +35,7 @@
 - [Magyar automatikus feliratfordítás – használat és TV-s tesztelés](HU-SUBTITLES.md)
 
 A magyar feliratos fork aktuális telepítője:
-**[IPK letöltése – 0.5.6](https://github.com/hajosattila/youtube-webos-hu-subs/raw/refs/heads/main/downloads/youtube.leanback.v4_0.5.6_all.ipk)**.
+**[IPK letöltése – 0.5.3](https://github.com/hajosattila/youtube-webos-hu-subs/raw/refs/heads/main/downloads/youtube.leanback.v4_0.5.3_all-hu.ipk)**.
 A magyar feliratot kézzel, a CC gombbal vagy a YouTube feliratmenüjében kell bekapcsolni.
 
 > [!NOTE]

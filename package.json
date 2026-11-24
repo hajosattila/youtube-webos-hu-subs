@@ -1,13 +1,13 @@
 {
   "name": "youtube-webos",
-  "version": "0.5.6",
+  "version": "0.5.3",
   "description": "Ad-free YouTube app for webOS",
   "type": "module",
   "main": "index.js",
   "scripts": {
     "build": "webpack --mode=production",
     "build:dev": "webpack --mode=development",
-    "package": "ares-package -n dist",
+    "package": "ares-package -n dist && node tools/rename-ipk.cjs",
     "deploy": "node tools/deploy.js",
     "inspect": "ares-inspect youtube.leanback.v4",
     "launch": "ares-launch youtube.leanback.v4",
