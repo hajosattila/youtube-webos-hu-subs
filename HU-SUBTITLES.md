@@ -1,13 +1,11 @@
 # Magyar feliratfordítás
 
-Ez a fork a YouTube saját fordításával kínál magyar feliratot. A feliratot
+Ez a fork a YouTube fordításával és Google Fordító-tartalékkal kínál magyar feliratot. A feliratot
 kézzel, a CC gombbal vagy a YouTube feliratmenüjében kell bekapcsolni.
 A zöld gombos alkalmazásmenüben nincs külön magyar feliratkapcsoló.
 A korábbi kapcsoló elmentett értéke nem befolyásolja a működést.
 
-Nincs benne hangsávnyelv alapján automatikus feliratkapcsolás, diagnosztikai
-panel vagy CC-megfigyelő. Nem használ DeepL-t vagy új külső függőséget.
-A kézi magyar fordítást a felhasználó már működőként visszaigazolta a tévén.
+Az alkalmazás a YouTube feliratmenüjét és a lejátszó feliratmegjelenítését használja.
 
 ## Telepítés és használat
 
@@ -21,7 +19,7 @@ Meglévő magyar felirat mellé nem készül újabb magyar sáv. Felirat nélkü
 videóhoz nem készít beszédfelismerést. Több hangsáv esetén az új opció
 elérhetősége a kiválasztott hangsáv feliratlistájától is függ.
 
-## A kód működése
+## Magyar fordítás
 
 A meglévő JSON.parse hook a YouTube fordítási nyelvlistáját szükség esetén
 kiegészíti a magyar nyelvvel. A fordítás lekérését és megjelenítését a
@@ -30,6 +28,17 @@ használható fordítási nyelvlista, a kód külön magyar sávot ad hozzá a
 timedtext címhez fűzött `tlang=hu` paraméterrel. A forrássáv címében lévő
 paraméterek kódolása megmarad. Az új sáv indexe a kapcsolódó hangsávok
 feliratlistájába kerül.
+
+Üres magyar válasz esetén az alkalmazás a videó eredeti hangsávjához tartozó
+feliratból próbál magyar fordítást kérni a YouTube-tól. Ha ez sem ad szöveget,
+az eredeti felirat szövegét a Google Fordítóval fordítja le. A Google Fordító
+felé csak feliratszöveg kerül, a videóazonosító, az aláírt feliratcím és a
+YouTube-sütik továbbítása nélkül. A felirat időzítése megmarad.
+
+A megadott `VzKA9ayxZMY` videón az **Automatikus fordítás → Magyar** útvonalon
+lehet ellenőrizni a javítást. A webOS webes felügyelőjének konzolja jelzi, ha
+a lejátszó az alternatív YouTube-forrásból vagy a Google Fordítóból kapott
+magyar szöveget.
 
 A megközelítés előzménye az upstream [#472 PR](https://github.com/webosbrew/youtube-webos/pull/472).
 A kód és az eredeti tesztek a korábban működő magyar fordításra épülnek;
@@ -51,8 +60,8 @@ pnpm run package
 A csomagolás a projekt gyökerében hozza létre az IPK-t; ezt a .gitignore
 kizárja a véletlen commitolásból. A downloads mappában egyetlen aktuális
 telepítő és a hozzá tartozó SHA-256 ellenőrzőösszeg marad.
-A helyi tesztek nem kérnek élő YouTube-fordítást, ezért új verziónál a magyar
-szöveg megjelenését, az időzítést és a kézi CC-kapcsolást a tévén is ellenőrizni kell.
+A helyi tesztek mintaválaszokat használnak. Új verziónál a magyar szöveg
+megjelenését, az időzítést és a kézi CC-kapcsolást a tévén is ellenőrizni kell.
 
 ## Későbbi frissítések
 

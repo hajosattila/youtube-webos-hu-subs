@@ -1,9 +1,29 @@
 import assert from 'node:assert/strict';
+import { registerHooks } from 'node:module';
 import { afterEach, beforeEach, mock, test } from 'node:test';
 import {
   addHungarianSubtitles,
   createCaptionParser
 } from '../src/subtitle-tracks.ts';
+
+// Node's native TypeScript loader requires the extensions webpack resolves.
+const sourceModules = registerHooks({
+  resolve(specifier, context, nextResolve) {
+    const isSourceModule = context.parentURL?.startsWith(
+      new URL('../src/', import.meta.url).href
+    );
+    return nextResolve(
+      isSourceModule &&
+        ['./subtitle-tracks', './caption-translation'].includes(specifier)
+        ? specifier + '.ts'
+        : specifier,
+      context
+    );
+  }
+});
+const { createCaptionRecovery, installCaptionRecovery } =
+  await import('../src/subtitle-recovery.ts');
+sourceModules.deregister();
 
 const SOURCE_URL =
   'https://www.youtube.com/api/timedtext?v=test-video&lang=en&kind=asr&fmt=json3&expire=123&signature=test%2Bsignature%2F%3D&pot=test%2Btoken';
@@ -140,16 +160,42 @@ test('prefers the default audio and only extends audio menus using that source',
   );
 });
 
-test('prefers manual captions over ASR within the same audio menu', () => {
+test('prefers original ASR captions within the same audio menu', () => {
   const input = response({
     captionTracks: [
       sourceTrack(),
-      sourceTrack({ kind: undefined, baseUrl: SOURCE_URL + '&name=manual' })
+      sourceTrack({
+        kind: undefined,
+        baseUrl: SOURCE_URL.replace('&kind=asr', '') + '&name=manual'
+      })
     ],
     audioTracks: [{ captionTrackIndices: [0, 1] }]
   });
   const translated = tracklist(addHungarianSubtitles(input)).captionTracks[2];
-  assert.equal(new URL(translated.baseUrl).searchParams.get('name'), 'manual');
+  assert.equal(new URL(translated.baseUrl).searchParams.get('kind'), 'asr');
+});
+
+test('prefers the original source when the default audio track is dubbed', () => {
+  const input = response({
+    captionTracks: [
+      sourceTrack({
+        languageCode: 'de-DE',
+        baseUrl:
+          SOURCE_URL.replace('lang=en', 'lang=de-DE') +
+          '&variant=timing-optimized'
+      }),
+      sourceTrack()
+    ],
+    audioTracks: [{ captionTrackIndices: [0] }, { captionTrackIndices: [1] }]
+  });
+  const parsed = tracklist(addHungarianSubtitles(input));
+  const url = new URL(parsed.captionTracks[2].baseUrl);
+  assert.equal(url.searchParams.get('lang'), 'en');
+  assert.equal(url.searchParams.get('variant'), null);
+  assert.deepEqual(
+    parsed.audioTracks.map((audio) => audio.captionTrackIndices),
+    [[0], [1, 2]]
+  );
 });
 
 test('uses the native translation menu alongside German and French', () => {
@@ -358,4 +404,125 @@ test('returns the original response on a processing failure without leaking URLs
   assert.equal(calls[0].arguments.length, 1);
   assert.doesNotMatch(calls[0].arguments[0], /signature|token|https:/);
   assert.equal(tracklist(input).captionTracks.length, 1);
+});
+
+const NATIVE_HU = SOURCE_URL.replace('&kind=asr', '&name=manual') + '&tlang=hu';
+const ENGLISH_CAPTIONS = {
+  events: [
+    { id: 1, wpWinPosId: 1 },
+    {
+      tStartMs: 1500,
+      dDurationMs: 2000,
+      segs: [{ utf8: 'Good' }, { utf8: ' morning!', tOffsetMs: 200 }]
+    },
+    {
+      tStartMs: 5000,
+      dDurationMs: 1000,
+      segs: [{ utf8: 'Good morning!' }]
+    }
+  ]
+};
+
+test('uses an alternate original ASR source after an empty native translation', async () => {
+  const recovery = createCaptionRecovery();
+  addHungarianSubtitles(response(), recovery.register);
+  const plan = recovery.plan(NATIVE_HU + '&sq=4');
+  const alternate = new URL(plan.alternate);
+  const original = new URL(SOURCE_URL);
+  assert.equal(
+    alternate.searchParams.get('signature'),
+    original.searchParams.get('signature')
+  );
+  assert.equal(
+    alternate.searchParams.get('pot'),
+    original.searchParams.get('pot')
+  );
+  assert.equal(alternate.searchParams.get('tlang'), 'hu');
+  const hu = JSON.stringify({ events: [{ segs: [{ utf8: 'Jó reggelt!' }] }] });
+  const result = await recovery.recover(
+    '{"events":[]}',
+    plan,
+    async (url) => {
+      assert.equal(new URL(url).searchParams.get('kind'), 'asr');
+      assert.equal(new URL(url).searchParams.get('sq'), '4');
+      return new Response(hu);
+    },
+    () => assert.fail('Google Translate must not run when YouTube recovers')
+  );
+  assert.equal(result.body, hu);
+});
+
+test('translates source cue text and preserves timing after an empty Hungarian response', async () => {
+  const recovery = createCaptionRecovery();
+  const plan = recovery.plan(SOURCE_URL + '&tlang=hu');
+  assert.equal(plan.alternate, null);
+  const result = await recovery.recover(
+    '{"events":[{"id":1}]}',
+    plan,
+    async (url) => {
+      assert.equal(url, SOURCE_URL);
+      return Response.json(ENGLISH_CAPTIONS);
+    },
+    async (resource, init) => {
+      const url = new URL(resource);
+      assert.equal(url.origin, 'https://translate.googleapis.com');
+      assert.equal(url.searchParams.get('tl'), 'hu');
+      assert.deepEqual(url.searchParams.getAll('q'), ['Good morning!']);
+      assert.equal(url.searchParams.has('pot'), false);
+      assert.equal(init.credentials, 'omit');
+      assert.equal(init.referrerPolicy, 'no-referrer');
+      return Response.json([['Jó reggelt!', 'en']]);
+    }
+  );
+  const data = await result.response.json();
+  assert.deepEqual(data.events, [
+    { id: 1, wpWinPosId: 1 },
+    { tStartMs: 1500, dDurationMs: 2000, segs: [{ utf8: 'Jó reggelt!' }] },
+    { tStartMs: 5000, dDurationMs: 1000, segs: [{ utf8: 'Jó reggelt!' }] }
+  ]);
+});
+
+test('preserves a successful Hungarian timedtext response', async () => {
+  const recovery = createCaptionRecovery();
+  const fetchUnexpected = () =>
+    assert.fail('Successful captions need no retry');
+  const result = await recovery.recover(
+    '{"events":[{"segs":[{"utf8":"Jó reggelt!"}]}]}',
+    recovery.plan(NATIVE_HU),
+    fetchUnexpected,
+    fetchUnexpected
+  );
+  assert.equal(result, null);
+});
+
+test('Google Translate failure leaves the original caption response intact', async () => {
+  const recovery = createCaptionRecovery();
+  const body = 'WEBVTT\n\n00:00:01.500 --> 00:00:03.500\nGood morning!\n';
+  const native = new Response('WEBVTT\n', { status: 200 });
+  const transport = {
+    XMLHttpRequest: class {
+      open() {}
+      abort() {}
+    },
+    async fetch(url) {
+      if (url === NATIVE_HU) return native;
+      if (new URL(url).hostname === 'translate.googleapis.com')
+        return new Response(null, { status: 429 });
+      return new Response(body);
+    }
+  };
+  installCaptionRecovery(recovery, transport);
+  assert.equal(await transport.fetch(NATIVE_HU), native);
+  assert.equal(await native.text(), 'WEBVTT\n');
+});
+
+test('leaves French, German, native Hungarian and unrelated requests alone', () => {
+  const recovery = createCaptionRecovery();
+  for (const resource of [
+    SOURCE_URL + '&tlang=fr',
+    SOURCE_URL + '&tlang=de',
+    SOURCE_URL.replace('lang=en', 'lang=hu'),
+    NATIVE_HU.replace('www.youtube.com', 'example.org')
+  ])
+    assert.equal(recovery.plan(resource), null);
 });
