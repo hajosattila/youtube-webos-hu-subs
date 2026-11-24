@@ -543,13 +543,29 @@ test('tries a second YouTube source before falling back to Google', async () => 
   assert.match(result.body, /Jó reggelt/);
 });
 
+function verifiedPublic(input) {
+  return {
+    ...input,
+    videoDetails: {
+      ...input.videoDetails,
+      isPrivate: false,
+      isCrawlable: true
+    },
+    microformat: { playerMicroformatRenderer: { isUnlisted: false } }
+  };
+}
+
 test('the direct Hungarian track falls back to translated cue text with the original timing', async () => {
   const recovery = createCaptionRecovery();
-  const input = response({
-    translationLanguages: [
-      { languageCode: 'hu', languageName: { simpleText: 'Magyar' } }
-    ]
-  });
+  const baseUrl = SOURCE_URL + '&ei=public-session';
+  const input = verifiedPublic(
+    response({
+      captionTracks: [sourceTrack({ baseUrl })],
+      translationLanguages: [
+        { languageCode: 'hu', languageName: { simpleText: 'Magyar' } }
+      ]
+    })
+  );
   const renderer = tracklist(addHungarianSubtitles(input, recovery.register));
   const plan = recovery.plan(renderer.captionTracks[1].baseUrl);
   assert.deepEqual(plan.alternates, []);
@@ -557,7 +573,7 @@ test('the direct Hungarian track falls back to translated cue text with the orig
     '{"events":[{"id":1}]}',
     plan,
     async (url) => {
-      assert.equal(url, SOURCE_URL);
+      assert.equal(url, baseUrl);
       return Response.json(ENGLISH_CAPTIONS);
     },
     async (resource, init) => {
@@ -594,6 +610,12 @@ test('preserves a successful Hungarian timedtext response', async () => {
 
 test('Google Translate failure leaves the original caption response intact', async () => {
   const recovery = createCaptionRecovery();
+  const baseUrl = SOURCE_URL + '&ei=public-session';
+  addHungarianSubtitles(
+    verifiedPublic(response({ captionTracks: [sourceTrack({ baseUrl })] })),
+    recovery.register
+  );
+  const hungarian = baseUrl + '&tlang=hu';
   const body = 'WEBVTT\n\n00:00:01.500 --> 00:00:03.500\nGood morning!\n';
   const native = new Response('WEBVTT\n', { status: 200 });
   const transport = {
@@ -602,15 +624,60 @@ test('Google Translate failure leaves the original caption response intact', asy
       abort() {}
     },
     async fetch(url) {
-      if (url === NATIVE_HU) return native;
+      if (url === hungarian) return native;
       if (new URL(url).hostname === 'translate.googleapis.com')
         return new Response(null, { status: 429 });
       return new Response(body);
     }
   };
   installCaptionRecovery(recovery, transport);
-  assert.equal(await transport.fetch(NATIVE_HU), native);
+  assert.equal(await transport.fetch(hungarian), native);
   assert.equal(await native.text(), 'WEBVTT\n');
+});
+
+test('blocks Google for private, unlisted or unverified playback', async () => {
+  const baseUrl = SOURCE_URL + '&ei=public-session';
+  const input = response({ captionTracks: [sourceTrack({ baseUrl })] });
+  const publicInput = verifiedPublic(input);
+  const recovery = createCaptionRecovery();
+  const resource = baseUrl + '&tlang=hu';
+  for (const playerResponse of [
+    input,
+    {
+      ...publicInput,
+      videoDetails: { ...publicInput.videoDetails, isPrivate: true }
+    },
+    {
+      ...publicInput,
+      microformat: { playerMicroformatRenderer: { isUnlisted: true } }
+    }
+  ]) {
+    addHungarianSubtitles(publicInput, recovery.register);
+    assert.equal(recovery.plan(resource).allowGoogle, true);
+    addHungarianSubtitles(playerResponse, recovery.register);
+    const unexpected = () =>
+      assert.fail('No fallback network request is permitted');
+    assert.equal(
+      // eslint-disable-next-line no-await-in-loop
+      await recovery.recover(
+        '',
+        recovery.plan(resource),
+        unexpected,
+        unexpected
+      ),
+      null
+    );
+  }
+  addHungarianSubtitles(publicInput, recovery.register);
+  assert.equal(
+    recovery.plan(resource.replace('&ei=public-session', '')).allowGoogle,
+    false
+  );
+  assert.equal(
+    recovery.plan(resource.replace('public-session', 'other-session'))
+      .allowGoogle,
+    false
+  );
 });
 
 test('leaves French, German, native Hungarian and unrelated requests alone', () => {

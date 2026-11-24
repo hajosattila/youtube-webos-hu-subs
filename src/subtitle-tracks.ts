@@ -128,7 +128,7 @@ function getSources(renderer: JsonObject, response: JsonObject) {
 }
 
 export type CaptionSources = ReturnType<typeof getSources>;
-type RegisterSources = (sources: CaptionSources) => void;
+type RegisterSources = (sources: CaptionSources, publicVideo: boolean) => void;
 
 function translateTracklist(
   renderer: JsonObject,
@@ -223,7 +223,20 @@ function translatePlayerResponse(
   const renderer = captions.playerCaptionsTracklistRenderer;
   if (!isObject(renderer)) return response;
   const sources = getSources(renderer, response);
-  registerSources?.(sources);
+  const details = response.videoDetails;
+  const microformat = response.microformat;
+  const format = isObject(microformat)
+    ? microformat.playerMicroformatRenderer
+    : null;
+  const publicVideo =
+    isObject(details) &&
+    details.isPrivate === false &&
+    details.isCrawlable === true &&
+    isObject(format) &&
+    format.isUnlisted === false &&
+    typeof details.videoId === 'string' &&
+    sources.every(({ url }) => url.searchParams.get('v') === details.videoId);
+  registerSources?.(sources, publicVideo);
   const translated = translateTracklist(renderer, sources);
   if (!translated) return response;
 

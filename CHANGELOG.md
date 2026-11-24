@@ -1,4 +1,15 @@
-# Changelog
+# Változásnapló
+
+## 0.5.3 magyar feliratos build
+
+- Közvetlen **Magyar (automatikus fordítás)** sáv került a feliratlista elejére. A kézi CC-kapcsolás és a YouTube feliratmegjelenítése megmaradt.
+- Üres magyar válasznál a lejátszó megpróbálja újra felhasználni az adott munkamenet sikeres eredeti feliratkérését, illetve másik elérhető YouTube-forrást is kipróbál.
+- A Google Fordító-tartalék csak az aktuális munkamenetben nyilvánosként azonosított videóknál küld feliratszöveget.
+- A debug napló a feliratkérések aláírt címeit és a fordításra küldött szöveget elrejti.
+- A csomagolás a hivatalos webOS CLI 3.2.6-os verziójára és a javított `proxy-addr` függőségre váltott.
+- A telepítő belső verziója `0.5.3`, fájlneve `youtube.leanback.v4_0.5.3_all-hu.ipk`.
+
+## Az eredeti projekt változásai
 
 All notable changes to this project will be documented in this file.
 

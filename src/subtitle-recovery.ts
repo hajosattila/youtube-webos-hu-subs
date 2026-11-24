@@ -112,7 +112,10 @@ async function withTimeout<T>(
 }
 
 export function createCaptionRecovery() {
-  const videos = new Map<string, CaptionSources>();
+  const videos = new Map<
+    string,
+    { sources: CaptionSources; publicVideo: boolean }
+  >();
   const workingRequests = new Map<string, URL>();
 
   function recordOriginal(url: URL, body: string) {
@@ -121,7 +124,9 @@ export function createCaptionRecovery() {
     if (
       videos
         .get(video)
-        ?.some(({ url: source, dubbed }) => dubbed && sameTrack(source, url))
+        ?.sources.some(
+          ({ url: source, dubbed }) => dubbed && sameTrack(source, url)
+        )
     )
       return;
     workingRequests.delete(video);
@@ -132,11 +137,11 @@ export function createCaptionRecovery() {
     }
   }
 
-  function register(sources: CaptionSources) {
+  function register(sources: CaptionSources, publicVideo = false) {
     const video = sources[0]?.url.searchParams.get('v');
     if (!video) return;
     videos.delete(video);
-    videos.set(video, sources);
+    videos.set(video, { sources, publicVideo });
     if (videos.size > 8) {
       const oldest = videos.keys().next().value;
       if (oldest !== undefined) videos.delete(oldest);
@@ -153,7 +158,9 @@ export function createCaptionRecovery() {
     const video = request.searchParams.get('v');
     if (!video) return null;
 
-    const available = videos.get(video)?.filter(
+    const registered = videos.get(video);
+    const session = request.searchParams.get('ei');
+    const available = registered?.sources.filter(
       ({ url, dubbed }) =>
         !dubbed &&
         url.origin === request.origin &&
@@ -189,6 +196,8 @@ export function createCaptionRecovery() {
     if (
       working &&
       working.origin === request.origin &&
+      session &&
+      working.searchParams.get('ei') === session &&
       sameTrack(working, request) &&
       ['fmt', 'sq'].every(
         (key) => working.searchParams.get(key) === request.searchParams.get(key)
@@ -211,6 +220,11 @@ export function createCaptionRecovery() {
 
     return {
       alternates: [...alternates],
+      allowGoogle: Boolean(
+        registered?.publicVideo &&
+        session &&
+        available?.some(({ url }) => url.searchParams.get('ei') === session)
+      ),
       source: getUrl(preferred, null) ?? getUrl(request, null),
       originalSource: getUrl(request, null)
     };
@@ -259,7 +273,7 @@ export function createCaptionRecovery() {
       }
     }
 
-    if (!source) return null;
+    if (!source || !recoveryPlan.allowGoogle) return null;
     const result = await withTimeout(
       async (signal) => {
         let response = await fetchSource(source, signal);
