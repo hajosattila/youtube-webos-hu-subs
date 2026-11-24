@@ -12,7 +12,7 @@ Az alkalmazás a YouTube feliratmenüjét és a lejátszó feliratmegjelenítés
 1. Töltsd le az [aktuális, 0.5.3-as IPK-t](https://github.com/hajosattila/youtube-webos-hu-subs/raw/refs/heads/main/downloads/youtube.leanback.v4_0.5.3_all-hu.ipk).
 2. Telepítsd a webOS Dev Managerrel, majd teljesen zárd be és indítsd újra az alkalmazást.
 3. Nyiss meg egy működő, fordítható felirattal rendelkező videót.
-4. A YouTube feliratmenüjében az **Automatikus fordítás** alatt válaszd a **Magyar** nyelvet. Ha nincs ilyen almenü, válaszd a **Magyar (automatikus fordítás)** sávot.
+4. A feliratok fő listájában válaszd a **Magyar (automatikus fordítás)** sávot. A YouTube a **Magyar** opciót az **Automatikus fordítás** almenüben is megkaphatja.
 5. A CC gombbal kézzel ki- és bekapcsolhatod a feliratot.
 
 Meglévő magyar felirat mellé nem készül újabb magyar sáv. Felirat nélküli
@@ -23,9 +23,9 @@ elérhetősége a kiválasztott hangsáv feliratlistájától is függ.
 
 A meglévő JSON.parse hook a YouTube fordítási nyelvlistáját szükség esetén
 kiegészíti a magyar nyelvvel. A fordítás lekérését és megjelenítését a
-YouTube lejátszója végzi a kiválasztott forrássávhoz. Ha a válaszban nincs
-használható fordítási nyelvlista, a kód külön magyar sávot ad hozzá a
-timedtext címhez fűzött `tlang=hu` paraméterrel. A forrássáv címében lévő
+YouTube lejátszója végzi a kiválasztott forrássávhoz. A fő feliratlistához
+adott magyar sáv ugyanezt a fordítást kéri a timedtext címhez fűzött
+`tlang=hu` paraméterrel. A forrássáv címében lévő
 paraméterek kódolása megmarad. Az új sáv indexe a kapcsolódó hangsávok
 feliratlistájába kerül.
 
@@ -35,8 +35,8 @@ az eredeti felirat szövegét a Google Fordítóval fordítja le. A Google Ford�
 felé csak feliratszöveg kerül, a videóazonosító, az aláírt feliratcím és a
 YouTube-sütik továbbítása nélkül. A felirat időzítése megmarad.
 
-A megadott `VzKA9ayxZMY` videón az **Automatikus fordítás → Magyar** útvonalon
-lehet ellenőrizni a javítást. A webOS webes felügyelőjének konzolja jelzi, ha
+A megadott `VzKA9ayxZMY` videón a **Magyar (automatikus fordítás)** közvetlen
+kiválasztásával lehet ellenőrizni a javítást. A webOS webes felügyelőjének konzolja jelzi, ha
 a lejátszó az alternatív YouTube-forrásból vagy a Google Fordítóból kapott
 magyar szöveget.
 

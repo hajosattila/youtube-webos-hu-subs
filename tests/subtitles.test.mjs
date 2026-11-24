@@ -198,7 +198,7 @@ test('prefers the original source when the default audio track is dubbed', () =>
   );
 });
 
-test('uses the native translation menu alongside German and French', () => {
+test('adds the direct Hungarian track alongside the native translation menu', () => {
   const languages = [
     { languageCode: 'de', languageName: { simpleText: 'Deutsch' } },
     { languageCode: 'fr', languageName: { simpleText: 'Français' } }
@@ -210,18 +210,34 @@ test('uses the native translation menu alongside German and French', () => {
     ...languages,
     { languageCode: 'hu', languageName: { simpleText: 'Magyar' } }
   ]);
-  assert.equal(result.captionTracks, original.captionTracks);
-  assert.equal(result.audioTracks, original.audioTracks);
+  assert.equal(result.captionTracks[0], original.captionTracks[0]);
+  assert.equal(result.captionTracks[1].languageCode, 'hu');
+  assert.deepEqual(result.audioTracks[0].captionTrackIndices, [0, 1]);
+  assert.equal(
+    result.audioTracks[0].defaultCaptionTrackIndex,
+    original.audioTracks[0].defaultCaptionTrackIndex
+  );
 });
 
-test('keeps an advertised Hungarian translation without a duplicate track', () => {
+test('keeps the advertised Hungarian translation and one direct track', () => {
   for (const languageCode of ['hu', 'hu-HU']) {
     const input = response({
       translationLanguages: [
         { languageCode, languageName: { simpleText: 'Magyar' } }
       ]
     });
-    assert.equal(addHungarianSubtitles(input), input);
+    const parsed = addHungarianSubtitles(input);
+    const result = tracklist(parsed);
+    assert.equal(
+      result.translationLanguages,
+      tracklist(input).translationLanguages
+    );
+    assert.equal(
+      result.captionTracks.filter((track) => track.languageCode === 'hu')
+        .length,
+      1
+    );
+    assert.equal(addHungarianSubtitles(parsed), parsed);
   }
 });
 
@@ -452,9 +468,15 @@ test('uses an alternate original ASR source after an empty native translation', 
   assert.equal(result.body, hu);
 });
 
-test('translates source cue text and preserves timing after an empty Hungarian response', async () => {
+test('the direct Hungarian track falls back to translated cue text with the original timing', async () => {
   const recovery = createCaptionRecovery();
-  const plan = recovery.plan(SOURCE_URL + '&tlang=hu');
+  const input = response({
+    translationLanguages: [
+      { languageCode: 'hu', languageName: { simpleText: 'Magyar' } }
+    ]
+  });
+  const renderer = tracklist(addHungarianSubtitles(input, recovery.register));
+  const plan = recovery.plan(renderer.captionTracks[1].baseUrl);
   assert.equal(plan.alternate, null);
   const result = await recovery.recover(
     '{"events":[{"id":1}]}',

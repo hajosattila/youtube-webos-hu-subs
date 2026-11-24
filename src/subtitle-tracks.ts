@@ -148,35 +148,6 @@ function translateTracklist(
     ? renderer.audioTracks
     : null;
 
-  // Let the player build the translated request from the selected source when
-  // the native Auto-translate menu is available.
-  const languages = renderer.translationLanguages;
-  if (Array.isArray(languages) && languages.length > 0) {
-    if (
-      languages.some((lang) => isObject(lang) && isHungarian(lang.languageCode))
-    )
-      return null;
-
-    const usesRuns = languages.some(
-      (lang) =>
-        isObject(lang) &&
-        isObject(lang.languageName) &&
-        Array.isArray(lang.languageName.runs)
-    );
-    return {
-      ...renderer,
-      translationLanguages: [
-        ...languages,
-        {
-          languageCode: 'hu',
-          languageName: usesRuns
-            ? { runs: [{ text: 'Magyar' }] }
-            : { simpleText: 'Magyar' }
-        }
-      ]
-    };
-  }
-
   // Only copy caption metadata for the target language. In particular, an
   // Arabic source's rtl flag or an ASR source's kind must not label this track.
   const name =
@@ -209,6 +180,30 @@ function translateTracklist(
           }
         : audio
     );
+  }
+
+  // Keep the native Auto-translate option available alongside the direct track.
+  const languages = renderer.translationLanguages;
+  if (
+    Array.isArray(languages) &&
+    languages.length > 0 &&
+    !languages.some((lang) => isObject(lang) && isHungarian(lang.languageCode))
+  ) {
+    const usesRuns = languages.some(
+      (lang) =>
+        isObject(lang) &&
+        isObject(lang.languageName) &&
+        Array.isArray(lang.languageName.runs)
+    );
+    result.translationLanguages = [
+      ...languages,
+      {
+        languageCode: 'hu',
+        languageName: usesRuns
+          ? { runs: [{ text: 'Magyar' }] }
+          : { simpleText: 'Magyar' }
+      }
+    ];
   }
 
   return result;
