@@ -44,5 +44,5 @@ jobs:
             "downloads/$package_name.sha256" \
             "$manifest" \
             --verify-tag \
-            --title "YouTube Ad-Free magyar felirattal – $version" \
+            --title "$version" \
             --notes-file "$RUNNER_TEMP/hu-release-notes.md"
