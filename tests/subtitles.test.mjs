@@ -443,7 +443,7 @@ test('uses an alternate original ASR source after an empty native translation', 
   const recovery = createCaptionRecovery();
   addHungarianSubtitles(response(), recovery.register);
   const plan = recovery.plan(NATIVE_HU + '&sq=4');
-  const alternate = new URL(plan.alternate);
+  const alternate = new URL(plan.alternates[0]);
   const original = new URL(SOURCE_URL);
   assert.equal(
     alternate.searchParams.get('signature'),
@@ -468,6 +468,40 @@ test('uses an alternate original ASR source after an empty native translation', 
   assert.equal(result.body, hu);
 });
 
+test('tries a second YouTube source before falling back to Google', async () => {
+  const recovery = createCaptionRecovery();
+  const manual = sourceTrack({
+    kind: undefined,
+    baseUrl: SOURCE_URL.replace('&kind=asr', '&name=English')
+  });
+  addHungarianSubtitles(
+    response({
+      captionTracks: [sourceTrack(), manual],
+      audioTracks: [{ captionTrackIndices: [0, 1] }]
+    }),
+    recovery.register
+  );
+  const requests = [];
+  const result = await recovery.recover(
+    '',
+    recovery.plan(NATIVE_HU),
+    async (url) => {
+      const params = new URL(url).searchParams;
+      requests.push([params.get('kind'), params.get('name')]);
+      return params.get('kind') === 'asr'
+        ? Response.json({ events: [] })
+        : Response.json({ events: [{ segs: [{ utf8: 'Jó reggelt!' }] }] });
+    },
+    () =>
+      assert.fail('Google must not run when the second YouTube source works')
+  );
+  assert.deepEqual(requests, [
+    ['asr', null],
+    [null, 'English']
+  ]);
+  assert.match(result.body, /Jó reggelt/);
+});
+
 test('the direct Hungarian track falls back to translated cue text with the original timing', async () => {
   const recovery = createCaptionRecovery();
   const input = response({
@@ -477,7 +511,7 @@ test('the direct Hungarian track falls back to translated cue text with the orig
   });
   const renderer = tracklist(addHungarianSubtitles(input, recovery.register));
   const plan = recovery.plan(renderer.captionTracks[1].baseUrl);
-  assert.equal(plan.alternate, null);
+  assert.deepEqual(plan.alternates, []);
   const result = await recovery.recover(
     '{"events":[{"id":1}]}',
     plan,

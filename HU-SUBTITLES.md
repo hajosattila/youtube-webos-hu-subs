@@ -29,16 +29,17 @@ adott magyar sáv ugyanezt a fordítást kéri a timedtext címhez fűzött
 paraméterek kódolása megmarad. Az új sáv indexe a kapcsolódó hangsávok
 feliratlistájába kerül.
 
-Üres magyar válasz esetén az alkalmazás a videó eredeti hangsávjához tartozó
-feliratból próbál magyar fordítást kérni a YouTube-tól. Ha ez sem ad szöveget,
+Üres magyar válasz esetén az alkalmazás legfeljebb két másik forrássávból próbál
+magyar fordítást kérni a YouTube-tól. Előnyben részesíti az eredeti hangsáv
+automatikus átiratát. Ha egyik kérés sem ad szöveget,
 az eredeti felirat szövegét a Google Fordítóval fordítja le. A Google Fordító
 felé csak feliratszöveg kerül, a videóazonosító, az aláírt feliratcím és a
 YouTube-sütik továbbítása nélkül. A felirat időzítése megmarad.
 
 A megadott `VzKA9ayxZMY` videón a **Magyar (automatikus fordítás)** közvetlen
-kiválasztásával lehet ellenőrizni a javítást. A webOS webes felügyelőjének konzolja jelzi, ha
-a lejátszó az alternatív YouTube-forrásból vagy a Google Fordítóból kapott
-magyar szöveget.
+kiválasztásával lehet ellenőrizni a javítást. A webOS webes felügyelőjének konzolja jelzi,
+hogy a magyar szöveget a YouTube adta-e az első kérésre vagy másik forrássávból,
+illetve hogy a Google Fordító adta-e.
 
 A megközelítés előzménye az upstream [#472 PR](https://github.com/webosbrew/youtube-webos/pull/472).
 A kód és az eredeti tesztek a korábban működő magyar fordításra épülnek;

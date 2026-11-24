@@ -108,12 +108,6 @@ export function createCaptionRecovery() {
         })
     );
     const preferred = available?.[0]?.url ?? request;
-    const alternate = available?.find(({ url }) =>
-      TRACK_KEYS.some(
-        (key) => url.searchParams.get(key) !== request.searchParams.get(key)
-      )
-    )?.url;
-
     const getUrl = (url: URL, target: string | null) => {
       const signedParams = url.searchParams.get('sparams')?.split(',') ?? [];
       if (signedParams.includes('tlang')) return null;
@@ -131,8 +125,21 @@ export function createCaptionRecovery() {
       return withTimedTextParams(url, params);
     };
 
+    const alternates = new Set<string>();
+    for (const { url } of available ?? []) {
+      if (
+        TRACK_KEYS.every(
+          (key) => url.searchParams.get(key) === request.searchParams.get(key)
+        )
+      )
+        continue;
+      const translated = getUrl(url, 'hu');
+      if (translated) alternates.add(translated);
+      if (alternates.size === 2) break;
+    }
+
     return {
-      alternate: alternate ? getUrl(alternate, 'hu') : null,
+      alternates: [...alternates],
       source: getUrl(preferred, null) ?? getUrl(request, null),
       originalSource: getUrl(request, null)
     };
@@ -148,16 +155,29 @@ export function createCaptionRecovery() {
     fetchTranslation: typeof fetch,
     cancel?: AbortSignal | null
   ) {
-    if (hasCaptionText(text)) return null;
+    if (hasCaptionText(text)) {
+      console.info('[subtitles] YouTube returned Hungarian captions');
+      return null;
+    }
 
-    const { alternate, source, originalSource } = recoveryPlan;
-    if (alternate) {
+    const { alternates, source, originalSource } = recoveryPlan;
+    if (alternates.length) {
       const result = await withTimeout(
         async (signal) => {
-          const response = await fetchSource(alternate, signal);
-          if (!response.ok) return null;
-          const body = await response.clone().text();
-          return hasCaptionText(body) ? { response, body } : null;
+          for (const alternate of alternates) {
+            if (signal?.aborted || cancel?.aborted) break;
+            try {
+              // eslint-disable-next-line no-await-in-loop
+              const response = await fetchSource(alternate, signal);
+              if (!response.ok) continue;
+              // eslint-disable-next-line no-await-in-loop
+              const body = await response.clone().text();
+              if (hasCaptionText(body)) return { response, body };
+            } catch {
+              // A failed request can still leave another YouTube source.
+            }
+          }
+          return null;
         },
         3000,
         cancel
@@ -371,6 +391,7 @@ export function installCaptionRecovery(
           else if (responseType !== 'document') body = xhr.responseText;
         }
         if (hasCaptionText(body)) {
+          console.info('[subtitles] YouTube returned Hungarian captions');
           reset();
           return;
         }
