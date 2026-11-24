@@ -2,6 +2,9 @@
 
 A [webosbrew/youtube-webos](https://github.com/webosbrew/youtube-webos) magyar feliratos változata LG webOS tévékre. Az eredeti alkalmazás reklámblokkolását, SponsorBlock-támogatását és lejátszási beállításait egészíti ki.
 
+<img width="2560" height="1440" alt="scrn_20261124_141248" src="https://github.com/user-attachments/assets/25481cc4-9912-4d3c-ad10-589b75b1cf0f" />
+
+
 ## Miben tér el az eredetitől?
 
 - A feliratlista elején külön **Magyar (automatikus fordítás)** sáv jelenhet meg a fordítható videóknál. A feliratot kézzel, a CC gombbal vagy a YouTube menüjében kapcsolhatod be.
