@@ -12,7 +12,7 @@ A [webosbrew/youtube-webos](https://github.com/webosbrew/youtube-webos) magyar f
 
 - **Telepítő** – [youtube.leanback.v4_0.5.3_all-hu.ipk](downloads/youtube.leanback.v4_0.5.3_all-hu.ipk?raw=true)
 - **Ellenőrzőösszeg** – [SHA-256](downloads/youtube.leanback.v4_0.5.3_all-hu.ipk.sha256)
-- **Forráskód** – [alkalmazáskód](src/) és [buildelési útmutató](HU-SUBTITLES.md#fejlesztés-és-ellenőrzés)
+- **Forráskód** – [ZIP letöltése](https://github.com/hajosattila/youtube-webos-hu-subs/archive/e0011952f3acdfc4c9e9e13557cdb2e1a33304e7.zip), [alkalmazáskód](src/) és [buildelési útmutató](HU-SUBTITLES.md#fejlesztés-és-ellenőrzés)
 - **Változásnapló** – [kiadási megjegyzések](CHANGELOG.md)
 
 ## Telepítés és használat
