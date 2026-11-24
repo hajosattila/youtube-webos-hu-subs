@@ -28,10 +28,6 @@ jobs:
           test "$RELEASE_TAG" = "v${version}-hu"
           (cd downloads && sha256sum --check "$package_name.sha256")
 
-          cp "downloads/$package_name" .
-          manifest="$app_id.manifest.json"
-          node tools/gen-manifest.cjs "$manifest"
-
           awk -v heading="## $version magyar feliratos build" '
             $0 == heading { found = 1; next }
             found && /^## / { exit }
@@ -41,8 +37,6 @@ jobs:
 
           gh release create "$RELEASE_TAG" \
             "downloads/$package_name" \
-            "downloads/$package_name.sha256" \
-            "$manifest" \
             --verify-tag \
             --title "$version" \
             --notes-file "$RUNNER_TEMP/hu-release-notes.md"
