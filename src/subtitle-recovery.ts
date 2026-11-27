@@ -42,14 +42,15 @@ function canRecover(status: number) {
   return (status >= 200 && status < 300) || status === 404 || status === 429;
 }
 
-function originalCaptionRequest(resource: string) {
-  const url = timedTextUrl(resource);
-  return url &&
-    url.searchParams.get('v') &&
-    !url.searchParams.has('tlang') &&
+function isHungarianRequest(url: URL) {
+  return /^hu(?:-|$)/i.test(url.searchParams.get('tlang') ?? '');
+}
+
+function canRecordWorking(url: URL) {
+  return (
+    !url.searchParams.get('sparams')?.split(',').includes('tlang') &&
     url.searchParams.get('variant') !== 'timing-optimized'
-    ? url
-    : null;
+  );
 }
 
 function sameTrack(first: URL, second: URL) {
@@ -116,9 +117,9 @@ export function createCaptionRecovery() {
     string,
     { sources: CaptionSources; publicVideo: boolean }
   >();
-  const workingRequests = new Map<string, URL>();
+  const workingRequests: URL[] = [];
 
-  function recordOriginal(url: URL, body: string) {
+  function recordWorking(url: URL, body: string) {
     const video = url.searchParams.get('v');
     if (!video || !hasCaptionText(body)) return;
     if (
@@ -129,12 +130,12 @@ export function createCaptionRecovery() {
         )
     )
       return;
-    workingRequests.delete(video);
-    workingRequests.set(video, url);
-    if (workingRequests.size > 8) {
-      const oldest = workingRequests.keys().next().value;
-      if (oldest !== undefined) workingRequests.delete(oldest);
-    }
+    const previous = workingRequests.findIndex(
+      (entry) => entry.href === url.href
+    );
+    if (previous >= 0) workingRequests.splice(previous, 1);
+    workingRequests.unshift(url);
+    if (workingRequests.length > 8) workingRequests.pop();
   }
 
   function register(sources: CaptionSources, publicVideo = false) {
@@ -150,11 +151,7 @@ export function createCaptionRecovery() {
 
   function plan(resource: string) {
     const request = timedTextUrl(resource);
-    if (
-      !request ||
-      !/^hu(?:-|$)/i.test(request.searchParams.get('tlang') ?? '')
-    )
-      return null;
+    if (!request || !isHungarianRequest(request)) return null;
     const video = request.searchParams.get('v');
     if (!video) return null;
 
@@ -192,22 +189,24 @@ export function createCaptionRecovery() {
     const alternates = new Set<string>();
     // The actual successful player request includes runtime parameters that
     // may be absent from the base URL in the player response.
-    const working = workingRequests.get(video);
-    if (
-      working &&
-      working.origin === request.origin &&
-      session &&
-      working.searchParams.get('ei') === session &&
-      sameTrack(working, request) &&
-      ['fmt', 'sq'].every(
-        (key) => working.searchParams.get(key) === request.searchParams.get(key)
-      ) &&
-      ['c', 'cver', 'ei'].every((key) => {
-        const value = request.searchParams.get(key);
-        return !value || working.searchParams.get(key) === value;
-      }) &&
-      !sameRequest(working, request)
-    ) {
+    const working = workingRequests.find(
+      (working) =>
+        working.searchParams.get('v') === video &&
+        working.origin === request.origin &&
+        session &&
+        working.searchParams.get('ei') === session &&
+        sameTrack(working, request) &&
+        ['fmt', 'sq'].every(
+          (key) =>
+            working.searchParams.get(key) === request.searchParams.get(key)
+        ) &&
+        ['c', 'cver', 'ei'].every((key) => {
+          const value = request.searchParams.get(key);
+          return !value || working.searchParams.get(key) === value;
+        }) &&
+        !sameRequest(working, request)
+    );
+    if (working) {
       alternates.add(withTimedTextParams(working, { tlang: 'hu' }));
     }
 
@@ -220,6 +219,7 @@ export function createCaptionRecovery() {
 
     return {
       alternates: [...alternates],
+      retryUrl: request.searchParams.has('sq') ? null : request.href,
       allowGoogle: Boolean(
         registered?.publicVideo &&
         session &&
@@ -238,7 +238,8 @@ export function createCaptionRecovery() {
       signal: AbortSignal | undefined
     ) => Promise<Response>,
     fetchTranslation: typeof fetch,
-    cancel?: AbortSignal | null
+    cancel?: AbortSignal | null,
+    status = 200
   ) {
     if (hasCaptionText(text)) {
       console.info('[subtitles] YouTube returned Hungarian captions');
@@ -246,14 +247,26 @@ export function createCaptionRecovery() {
     }
 
     const { alternates, source, originalSource } = recoveryPlan;
-    if (alternates.length) {
+    const retrySame =
+      !alternates.length && status === 200 && recoveryPlan.retryUrl;
+    const attempts = retrySame ? [retrySame] : alternates;
+    console.info(
+      '[subtitles] Hungarian captions unavailable from YouTube, HTTP',
+      status
+    );
+    if (attempts.length && status !== 429 && !cancel?.aborted) {
       const result = await withTimeout(
         async (signal) => {
-          for (const alternate of alternates) {
+          // A single source can be temporarily empty on first selection.
+          if (retrySame)
+            await new Promise((resolve) => setTimeout(resolve, 400));
+          for (const alternate of attempts) {
             if (signal?.aborted || cancel?.aborted) break;
             try {
               // eslint-disable-next-line no-await-in-loop
               const response = await fetchSource(alternate, signal);
+              console.info('[subtitles] YouTube retry HTTP', response.status);
+              if (response.status === 429) break;
               if (!response.ok) continue;
               // eslint-disable-next-line no-await-in-loop
               const body = await response.clone().text();
@@ -273,7 +286,7 @@ export function createCaptionRecovery() {
       }
     }
 
-    if (!source || !recoveryPlan.allowGoogle) return null;
+    if (!source || !recoveryPlan.allowGoogle || cancel?.aborted) return null;
     const result = await withTimeout(
       async (signal) => {
         let response = await fetchSource(source, signal);
@@ -314,7 +327,7 @@ export function createCaptionRecovery() {
     return result;
   }
 
-  return { register, recordOriginal, plan, recover };
+  return { register, recordWorking, plan, recover };
 }
 
 export function installCaptionRecovery(
@@ -346,14 +359,15 @@ export function installCaptionRecovery(
     const url = request?.url ?? String(resource);
     const method = init?.method ?? request?.method ?? 'GET';
     if (method.toUpperCase() !== 'GET') return originalFetch(resource, init);
-    const plan = recovery.plan(url);
-    if (!plan) {
-      const original = originalCaptionRequest(url);
-      if (!original) return originalFetch(resource, init);
+    const captionUrl = timedTextUrl(url);
+    if (!captionUrl?.searchParams.get('v'))
+      return originalFetch(resource, init);
+    if (!isHungarianRequest(captionUrl)) {
+      if (!canRecordWorking(captionUrl)) return originalFetch(resource, init);
       const response = await fetchWithoutXhr(resource, init);
       if (response.ok) {
         try {
-          recovery.recordOriginal(original, await response.clone().text());
+          recovery.recordWorking(captionUrl, await response.clone().text());
         } catch {
           // The original response remains available to the player.
         }
@@ -365,6 +379,8 @@ export function installCaptionRecovery(
 
     try {
       const text = response.ok ? await response.clone().text() : '';
+      const plan = recovery.plan(url);
+      if (!plan) return response;
       const result = await recovery.recover(
         text,
         plan,
@@ -373,11 +389,13 @@ export function installCaptionRecovery(
             request ? new Request(alternate, request) : alternate,
             {
               ...init,
+              cache: 'reload',
               ...(signal && { signal })
             }
           ),
         originalFetch,
-        init?.signal ?? request?.signal
+        init?.signal ?? request?.signal,
+        response.status
       );
       return result?.response ?? response;
     } catch {
@@ -437,9 +455,12 @@ export function installCaptionRecovery(
       !password &&
       method.toUpperCase() === 'GET' &&
       !fetchRequests.has(resource);
-    const plan = observe ? recovery.plan(resource) : null;
-    const original = observe && !plan ? originalCaptionRequest(resource) : null;
-    if (original) {
+    const captionUrl = observe ? timedTextUrl(resource) : null;
+    if (
+      captionUrl?.searchParams.get('v') &&
+      !isHungarianRequest(captionUrl) &&
+      canRecordWorking(captionUrl)
+    ) {
       const xhr = this;
       const reset = () => active.delete(xhr);
       active.set(xhr, {
@@ -448,12 +469,11 @@ export function installCaptionRecovery(
           if (event.type !== 'readystatechange' || xhr.readyState !== 4) return;
           reset();
           if (xhr.status >= 200 && xhr.status < 300)
-            recovery.recordOriginal(original, xhrCaptionBody(xhr));
+            recovery.recordWorking(captionUrl, xhrCaptionBody(xhr));
         }
       });
     }
-    if (plan) {
-      const recoveryPlan = plan;
+    if (captionUrl?.searchParams.get('v') && isHungarianRequest(captionUrl)) {
       const xhr = this;
       let delaying = false;
       let listening = true;
@@ -500,6 +520,11 @@ export function installCaptionRecovery(
           return;
         }
 
+        const recoveryPlan = recovery.plan(resource);
+        if (!recoveryPlan) {
+          reset();
+          return;
+        }
         delaying = true;
         event.stopImmediatePropagation();
         void recovery
@@ -508,11 +533,13 @@ export function installCaptionRecovery(
             recoveryPlan,
             (alternate, signal) =>
               fetchWithoutXhr(alternate, {
+                cache: 'reload',
                 credentials: xhr.withCredentials ? 'include' : 'same-origin',
                 ...(signal && { signal })
               }),
             originalFetch,
-            controller?.signal
+            controller?.signal,
+            xhr.status
           )
           .then((result) => {
             if (active.get(xhr)?.reset !== reset) return;

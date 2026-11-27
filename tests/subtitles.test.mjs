@@ -480,6 +480,110 @@ test('reuses the successful player request with its runtime parameters intact', 
   );
 });
 
+test('gives a single YouTube source another chance after an empty first response', async () => {
+  const recovery = createCaptionRecovery();
+  const baseUrl = SOURCE_URL + '&ei=public-session';
+  addHungarianSubtitles(
+    verifiedPublic(response({ captionTracks: [sourceTrack({ baseUrl })] })),
+    recovery.register
+  );
+  const url = baseUrl + '&tlang=hu';
+  const calls = [];
+  const captions = {
+    events: [{ tStartMs: 1500, segs: [{ utf8: 'Jó reggelt!' }] }]
+  };
+  const transport = {
+    XMLHttpRequest: class {
+      open() {}
+      abort() {}
+    },
+    async fetch(resource, init) {
+      calls.push([resource, init?.cache]);
+      return Response.json(calls.length === 1 ? { events: [] } : captions);
+    }
+  };
+  installCaptionRecovery(recovery, transport);
+  assert.deepEqual(await (await transport.fetch(url)).json(), captions);
+  assert.deepEqual(calls, [
+    [url, undefined],
+    [url, 'reload']
+  ]);
+});
+
+test('sees a native French translation that completes while Hungarian is loading', async () => {
+  const recovery = createCaptionRecovery();
+  const base = SOURCE_URL + '&ei=same-session&c=TVHTML5';
+  const hu = base + '&tlang=hu';
+  const fr = base + '&runtime=1&tlang=fr';
+  const expected = base + '&runtime=1&tlang=hu';
+  const calls = [];
+  const first = Promise.withResolvers();
+  const transport = {
+    XMLHttpRequest: class {
+      open() {}
+      abort() {}
+    },
+    async fetch(url) {
+      calls.push(url);
+      if (url === hu) return first.promise;
+      return Response.json({
+        events: [{ segs: [{ utf8: url === fr ? 'Bonjour' : 'Jó reggelt!' }] }]
+      });
+    }
+  };
+  installCaptionRecovery(recovery, transport);
+  const pending = transport.fetch(hu);
+  await transport.fetch(fr);
+  const otherTrack = fr.replace('lang=en', 'lang=de');
+  await transport.fetch(otherTrack);
+  first.resolve(Response.json({ events: [] }));
+  assert.equal(
+    (await (await pending).json()).events[0].segs[0].utf8,
+    'Jó reggelt!'
+  );
+  assert.deepEqual(calls, [hu, fr, otherTrack, expected]);
+});
+
+test('does not replay a signed translation target from another language', async () => {
+  const recovery = createCaptionRecovery();
+  const base = SOURCE_URL + '&ei=same-session';
+  const fr = base + '&runtime=1&sparams=v%2Ctlang&tlang=fr';
+  const transport = {
+    XMLHttpRequest: class {
+      open() {}
+      abort() {}
+    },
+    async fetch() {
+      return Response.json(ENGLISH_CAPTIONS);
+    }
+  };
+  installCaptionRecovery(recovery, transport);
+  await transport.fetch(fr);
+  assert.deepEqual(recovery.plan(base + '&tlang=hu').alternates, []);
+});
+
+test('does not retry a rate-limited translation or an empty caption segment on the same URL', async () => {
+  const recovery = createCaptionRecovery();
+  const calls = [];
+  const transport = {
+    XMLHttpRequest: class {
+      open() {}
+      abort() {}
+    },
+    async fetch(url) {
+      calls.push(url);
+      return new Response('', { status: url.includes('&sq=') ? 200 : 429 });
+    }
+  };
+  installCaptionRecovery(recovery, transport);
+  const rateLimited = NATIVE_HU + '&ei=test-session';
+  addHungarianSubtitles(response(), recovery.register);
+  await transport.fetch(rateLimited);
+  const segment = SOURCE_URL + '&tlang=hu&sq=1';
+  await transport.fetch(segment);
+  assert.deepEqual(calls, [rateLimited, segment]);
+});
+
 test('uses an alternate original ASR source after an empty native translation', async () => {
   const recovery = createCaptionRecovery();
   addHungarianSubtitles(response(), recovery.register);
@@ -569,12 +673,15 @@ test('the direct Hungarian track falls back to translated cue text with the orig
   const renderer = tracklist(addHungarianSubtitles(input, recovery.register));
   const plan = recovery.plan(renderer.captionTracks[1].baseUrl);
   assert.deepEqual(plan.alternates, []);
+  const sourceRequests = [];
   const result = await recovery.recover(
     '{"events":[{"id":1}]}',
     plan,
     async (url) => {
-      assert.equal(url, baseUrl);
-      return Response.json(ENGLISH_CAPTIONS);
+      sourceRequests.push(url);
+      return url === baseUrl
+        ? Response.json(ENGLISH_CAPTIONS)
+        : Response.json({ events: [] });
     },
     async (resource, init) => {
       const url = new URL(resource);
@@ -587,6 +694,10 @@ test('the direct Hungarian track falls back to translated cue text with the orig
       return Response.json([['Jó reggelt!', 'en']]);
     }
   );
+  assert.deepEqual(sourceRequests, [
+    renderer.captionTracks[1].baseUrl,
+    baseUrl
+  ]);
   const data = await result.response.json();
   assert.deepEqual(data.events, [
     { id: 1, wpWinPosId: 1 },
@@ -655,18 +766,24 @@ test('blocks Google for private, unlisted or unverified playback', async () => {
     addHungarianSubtitles(publicInput, recovery.register);
     assert.equal(recovery.plan(resource).allowGoogle, true);
     addHungarianSubtitles(playerResponse, recovery.register);
-    const unexpected = () =>
-      assert.fail('No fallback network request is permitted');
+    const calls = [];
     assert.equal(
       // eslint-disable-next-line no-await-in-loop
       await recovery.recover(
         '',
         recovery.plan(resource),
-        unexpected,
-        unexpected
+        async (url) => {
+          calls.push(url);
+          return Response.json({ events: [] });
+        },
+        async (url) => {
+          calls.push(url);
+          return Response.json([]);
+        }
       ),
       null
     );
+    assert.deepEqual(calls, [resource]);
   }
   addHungarianSubtitles(publicInput, recovery.register);
   assert.equal(

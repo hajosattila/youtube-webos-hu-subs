@@ -29,11 +29,14 @@ adott magyar sáv ugyanezt a fordítást kéri a timedtext címhez fűzött
 paraméterek kódolása megmarad. Az új sáv indexe a kapcsolódó hangsávok
 feliratlistájába kerül.
 
-Üres magyar válasz esetén az alkalmazás először egy már sikeres kérésből próbál
-új fordítást kérni a YouTube-tól, ha van ilyen ugyanahhoz a feliratsávhoz és
-lejátszási munkamenethez. Ebben csak a célnyelvet módosítja. Összesen legfeljebb
-két új YouTube-kérést küld, előnyben részesítve az eredeti hangsáv automatikus
-átiratát. Ha egyik kérés sem ad szöveget,
+Üres magyar válasznál az alkalmazás figyelembe veszi az ugyanebben a munkamenetben
+sikeresen betöltött eredeti feliratot vagy más nyelvre fordított sávot is. Ha a
+forrássáv, formátum és szegmens egyezik, a működő kérésben csak a célnyelvet
+cseréli magyarra. A lejátszó másik elérhető YouTube-forrásból is kérhet fordítást.
+Ha csak az első kérés ismételhető meg, és a teljes sávra üres HTTP 200 válasz
+érkezett, 400 ms múlva egyszer megismétli a magyar kérést. Egy kiválasztáshoz
+legfeljebb két további YouTube-fordítási kérést küld. HTTP 429 válasznál befejezi
+az adott kérés fordítási próbálkozásait. Ha a YouTube-tól továbbra sincs szöveg,
 az eredeti felirat szövegét csak akkor fordítja le a Google Fordítóval, ha a
 YouTube az aktuális munkamenetben nyilvánosként azonosította a videót. A Google Fordító
 felé csak feliratszöveg kerül, a videóazonosító, az aláírt feliratcím és a
@@ -42,7 +45,9 @@ YouTube-sütik továbbítása nélkül. A felirat időzítése megmarad.
 A megadott `VzKA9ayxZMY` videón a **Magyar (automatikus fordítás)** közvetlen
 kiválasztásával lehet ellenőrizni a javítást. A webOS webes felügyelőjének konzolja jelzi,
 hogy a magyar szöveget a YouTube adta-e az első kérésre vagy másik forrássávból,
-illetve hogy a Google Fordító adta-e.
+illetve hogy a Google Fordító adta-e. A `Recovered Hungarian captions with Google Translate`
+üzenet igazolja a tartalék használatát. Az üres vagy hibás első válasznál a napló
+a HTTP-státuszkódot is mutatja.
 
 A megközelítés előzménye az upstream [#472 PR](https://github.com/webosbrew/youtube-webos/pull/472).
 A kód és az eredeti tesztek a korábban működő magyar fordításra épülnek;
