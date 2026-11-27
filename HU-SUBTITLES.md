@@ -1,11 +1,7 @@
 # Magyar feliratfordítás
 
-Ez a fork a YouTube fordításával és Google Fordító-tartalékkal kínál magyar feliratot. A feliratot
-kézzel, a CC gombbal vagy a YouTube feliratmenüjében kell bekapcsolni.
-A zöld gombos alkalmazásmenüben nincs külön magyar feliratkapcsoló.
-A korábbi kapcsoló elmentett értéke nem befolyásolja a működést.
-
-Az alkalmazás a YouTube feliratmenüjét és a lejátszó feliratmegjelenítését használja.
+Ez a tesztváltozat a YouTube saját magyar feliratfordítását kéri.
+A feliratot kézzel kapcsolhatod be a CC gombbal vagy a YouTube menüjében.
 
 ## Telepítés és használat
 
@@ -21,32 +17,9 @@ elérhetősége a kiválasztott hangsáv feliratlistájától is függ.
 
 ## Magyar fordítás
 
-A meglévő JSON.parse hook a YouTube fordítási nyelvlistáját szükség esetén
-kiegészíti a magyar nyelvvel. A fordítás lekérését és megjelenítését a
-YouTube lejátszója végzi a kiválasztott forrássávhoz. A fő feliratlistához
-adott magyar sáv ugyanezt a fordítást kéri a timedtext címhez fűzött
-`tlang=hu` paraméterrel. A forrássáv címében lévő
-paraméterek kódolása megmarad. Az új sáv indexe a kapcsolódó hangsávok
-feliratlistájába kerül.
+A [fork első magyar változata](https://github.com/hajosattila/youtube-webos-hu-subs/commit/5d6cd0dbd545df7c97c63f6ff0f6ef96159847f7) alapján a kliens az alapértelmezett hangsáv feliratlistájában keres először kézi, majd automatikusan készített feliratot. Ha ott nincs használható sáv, a többi elérhető sávot vizsgálja meg. A kiválasztott sáv YouTube-címében a `tlang=hu` paraméter kéri a magyar fordítást. A lekérést és a válasz megjelenítését a YouTube lejátszója végzi.
 
-Üres magyar válasz esetén az alkalmazás először egy már sikeres kérésből próbál
-új fordítást kérni a YouTube-tól, ha van ilyen ugyanahhoz a feliratsávhoz és
-lejátszási munkamenethez. Ebben csak a célnyelvet módosítja. Összesen legfeljebb
-két új YouTube-kérést küld, előnyben részesítve az eredeti hangsáv automatikus
-átiratát. Ha egyik kérés sem ad szöveget,
-az eredeti felirat szövegét csak akkor fordítja le a Google Fordítóval, ha a
-YouTube az aktuális munkamenetben nyilvánosként azonosította a videót. A Google Fordító
-felé csak feliratszöveg kerül, a videóazonosító, az aláírt feliratcím és a
-YouTube-sütik továbbítása nélkül. A felirat időzítése megmarad.
-
-A megadott `VzKA9ayxZMY` videón a **Magyar (automatikus fordítás)** közvetlen
-kiválasztásával lehet ellenőrizni a javítást. A webOS webes felügyelőjének konzolja jelzi,
-hogy a magyar szöveget a YouTube adta-e az első kérésre vagy másik forrássávból,
-illetve hogy a Google Fordító adta-e.
-
-A megközelítés előzménye az upstream [#472 PR](https://github.com/webosbrew/youtube-webos/pull/472).
-A kód és az eredeti tesztek a korábban működő magyar fordításra épülnek;
-a későbbi automatikus kapcsolási kísérletek nem részei a jelenlegi forrásnak.
+A `VzKA9ayxZMY` videón a fő feliratlistában válaszd a **Magyar (automatikus fordítás)** sávot. A próba akkor sikeres, ha a beszédhez időzítve megjelenik a magyar szöveg. A tesztcsomagban a magyar fordítás egyetlen forrása a YouTube.
 
 ## Fejlesztés és ellenőrzés
 

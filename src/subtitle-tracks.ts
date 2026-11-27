@@ -11,135 +11,35 @@ function isHungarian(value: unknown) {
   return typeof value === 'string' && /^hu(?:-|$)/i.test(value);
 }
 
-export function timedTextUrl(value: unknown): URL | null {
+function translatedUrl(value: unknown): string | null {
   if (typeof value !== 'string' || !value) return null;
 
   try {
     const url = new URL(value, 'https://www.youtube.com');
-    return url.protocol === 'https:' &&
-      (url.hostname === 'youtube.com' ||
-        url.hostname.endsWith('.youtube.com')) &&
-      url.pathname === '/api/timedtext' &&
-      !url.username &&
-      !url.password
-      ? url
-      : null;
+    if (
+      url.protocol !== 'https:' ||
+      (url.hostname !== 'youtube.com' &&
+        !url.hostname.endsWith('.youtube.com')) ||
+      url.pathname !== '/api/timedtext' ||
+      url.username ||
+      url.password
+    )
+      return null;
+
+    // Keep the source language and all authorization parameters intact.
+    url.searchParams.set('tlang', 'hu');
+    return url.toString();
   } catch {
     return null;
   }
 }
 
-export function withTimedTextParams(
-  url: URL,
-  params: Record<string, string | null>
-): string {
-  const result = new URL(url.href);
-  // Preserve the original encoding of all untouched query parameters.
-  const query = url.search
-    ? url.search
-        .slice(1)
-        .split('&')
-        .filter((part) => {
-          const entry = new URLSearchParams(part);
-          return !Object.keys(params).some((key) => entry.has(key));
-        })
-    : [];
-  result.search = [
-    ...query,
-    ...Object.entries(params).flatMap(([key, value]) =>
-      value === null ? [] : [new URLSearchParams([[key, value]]).toString()]
-    )
-  ].join('&');
-  return result.href;
-}
-
-function autoDubbedLanguages(response: JsonObject) {
-  const streaming = response.streamingData;
-  const formats = isObject(streaming) ? streaming.adaptiveFormats : null;
-  const languages = new Set<string>();
-  if (Array.isArray(formats)) {
-    for (const format of formats) {
-      const audio = isObject(format) ? format.audioTrack : null;
-      if (
-        isObject(audio) &&
-        audio.isAutoDubbed === true &&
-        typeof audio.id === 'string'
-      ) {
-        languages.add(audio.id.replace(/\.\d+$/, '').toLowerCase());
-      }
-    }
-  }
-  return languages;
-}
-
-function getSources(renderer: JsonObject, response: JsonObject) {
-  const tracks: unknown[] = Array.isArray(renderer.captionTracks)
-    ? renderer.captionTracks
-    : [];
-  const audioTracks: unknown[] = Array.isArray(renderer.audioTracks)
-    ? renderer.audioTracks
-    : [];
-  const defaultAudioIndex = Number.isInteger(renderer.defaultAudioTrackIndex)
-    ? (renderer.defaultAudioTrackIndex as number)
-    : 0;
-  const defaultAudio = audioTracks[defaultAudioIndex];
-  const dubbedLanguages = autoDubbedLanguages(response);
-
-  return tracks
-    .flatMap((track, index) => {
-      if (
-        !isObject(track) ||
-        typeof track.languageCode !== 'string' ||
-        !track.languageCode ||
-        isHungarian(track.languageCode) ||
-        track.isTranslatable === false
-      )
-        return [];
-
-      // Only use tracks made available to at least one audio menu.
-      if (
-        audioTracks.length &&
-        !audioTracks.some(
-          (audio) =>
-            isObject(audio) &&
-            Array.isArray(audio.captionTrackIndices) &&
-            audio.captionTrackIndices.includes(index)
-        )
-      )
-        return [];
-
-      const url = timedTextUrl(track.baseUrl);
-      if (!url) return [];
-
-      const asr =
-        track.kind === 'asr' || url.searchParams.get('kind') === 'asr';
-      const dubbed =
-        url.searchParams.get('variant') === 'timing-optimized' ||
-        (asr && dubbedLanguages.has(track.languageCode.toLowerCase()));
-      const defaultAudioHasTrack =
-        isObject(defaultAudio) &&
-        Array.isArray(defaultAudio.captionTrackIndices) &&
-        defaultAudio.captionTrackIndices.includes(index);
-      const rank =
-        (dubbed ? 4 : 0) + (defaultAudioHasTrack ? 0 : 2) + (asr ? 0 : 1);
-      return [{ track, index, url, rank, dubbed }];
-    })
-    .sort((a, b) => a.rank - b.rank);
-}
-
-export type CaptionSources = ReturnType<typeof getSources>;
-type RegisterSources = (sources: CaptionSources, publicVideo: boolean) => void;
-
-function translateTracklist(
-  renderer: JsonObject,
-  sources: CaptionSources
-): JsonObject | null {
-  const tracks: unknown[] = Array.isArray(renderer.captionTracks)
-    ? renderer.captionTracks
-    : [];
-  const source = sources[0];
+function translateTracklist(renderer: JsonObject): JsonObject | null {
+  const captionTracks = renderer.captionTracks;
+  if (!Array.isArray(captionTracks)) return null;
+  const tracks: unknown[] = captionTracks;
   if (
-    !source ||
+    tracks.length === 0 ||
     tracks.some((track) => isObject(track) && isHungarian(track.languageCode))
   )
     return null;
@@ -147,6 +47,53 @@ function translateTracklist(
   const audioTracks = Array.isArray(renderer.audioTracks)
     ? renderer.audioTracks
     : null;
+  const defaultAudioIndex = Number.isInteger(renderer.defaultAudioTrackIndex)
+    ? (renderer.defaultAudioTrackIndex as number)
+    : 0;
+  const defaultAudio = audioTracks?.[defaultAudioIndex];
+  const preferredIndices =
+    isObject(defaultAudio) && Array.isArray(defaultAudio.captionTrackIndices)
+      ? defaultAudio.captionTrackIndices
+      : [];
+
+  function findSource(indices: unknown[], preferManual: boolean) {
+    for (const index of indices) {
+      if (typeof index !== 'number' || !Number.isInteger(index)) continue;
+      const track = tracks[index];
+      if (
+        !isObject(track) ||
+        typeof track.languageCode !== 'string' ||
+        !track.languageCode ||
+        track.isTranslatable === false ||
+        (preferManual && track.kind === 'asr')
+      )
+        continue;
+
+      // Do not offer a source excluded from every audio track's caption menu.
+      if (
+        audioTracks?.length &&
+        !audioTracks.some(
+          (audio) =>
+            isObject(audio) &&
+            Array.isArray(audio.captionTrackIndices) &&
+            audio.captionTrackIndices.includes(index)
+        )
+      )
+        continue;
+
+      const baseUrl = translatedUrl(track.baseUrl);
+      if (baseUrl) return { track, index, baseUrl };
+    }
+    return null;
+  }
+
+  const indices = tracks.map((_track, index) => index);
+  const source =
+    findSource(preferredIndices, true) ??
+    findSource(preferredIndices, false) ??
+    findSource(indices, true) ??
+    findSource(indices, false);
+  if (!source) return null;
 
   // Only copy caption metadata for the target language. In particular, an
   // Arabic source's rtl flag or an ASR source's kind must not label this track.
@@ -159,7 +106,7 @@ function translateTracklist(
     captionTracks: [
       ...tracks,
       {
-        baseUrl: withTimedTextParams(source.url, { tlang: 'hu' }),
+        baseUrl: source.baseUrl,
         name,
         vssId: '.hu',
         languageCode: 'hu',
@@ -176,7 +123,6 @@ function translateTracklist(
       audio.captionTrackIndices.includes(source.index)
         ? {
             ...audio,
-            // Keep the first track in place for players that use it by default.
             captionTrackIndices: [
               audio.captionTrackIndices[0],
               tracks.length,
@@ -187,57 +133,27 @@ function translateTracklist(
     );
   }
 
-  // Keep the native Auto-translate option available alongside the direct track.
+  // Some clients expose the native Auto-translate menu as well as captionTracks.
   const languages = renderer.translationLanguages;
   if (
     Array.isArray(languages) &&
-    languages.length > 0 &&
     !languages.some((lang) => isObject(lang) && isHungarian(lang.languageCode))
   ) {
-    const usesRuns = languages.some(
-      (lang) =>
-        isObject(lang) &&
-        isObject(lang.languageName) &&
-        Array.isArray(lang.languageName.runs)
-    );
     result.translationLanguages = [
       ...languages,
-      {
-        languageCode: 'hu',
-        languageName: usesRuns
-          ? { runs: [{ text: 'Magyar' }] }
-          : { simpleText: 'Magyar' }
-      }
+      { languageCode: 'hu', languageName: { simpleText: 'Magyar' } }
     ];
   }
 
   return result;
 }
 
-function translatePlayerResponse(
-  response: JsonObject,
-  registerSources?: RegisterSources
-): JsonObject {
+function translatePlayerResponse(response: JsonObject): JsonObject {
   const captions = response.captions;
   if (!isObject(captions)) return response;
   const renderer = captions.playerCaptionsTracklistRenderer;
   if (!isObject(renderer)) return response;
-  const sources = getSources(renderer, response);
-  const details = response.videoDetails;
-  const microformat = response.microformat;
-  const format = isObject(microformat)
-    ? microformat.playerMicroformatRenderer
-    : null;
-  const publicVideo =
-    isObject(details) &&
-    details.isPrivate === false &&
-    details.isCrawlable === true &&
-    isObject(format) &&
-    format.isUnlisted === false &&
-    typeof details.videoId === 'string' &&
-    sources.every(({ url }) => url.searchParams.get('v') === details.videoId);
-  registerSources?.(sources, publicVideo);
-  const translated = translateTracklist(renderer, sources);
+  const translated = translateTracklist(renderer);
   if (!translated) return response;
 
   return {
@@ -246,18 +162,12 @@ function translatePlayerResponse(
   };
 }
 
-export function addHungarianSubtitles(
-  value: unknown,
-  registerSources?: RegisterSources
-): unknown {
+export function addHungarianSubtitles(value: unknown): unknown {
   if (!isObject(value)) return value;
-  let result = translatePlayerResponse(value, registerSources);
+  let result = translatePlayerResponse(value);
   // Also handle responses that wrap an already parsed playerResponse object.
   if (isObject(value.playerResponse)) {
-    const playerResponse = translatePlayerResponse(
-      value.playerResponse,
-      registerSources
-    );
+    const playerResponse = translatePlayerResponse(value.playerResponse);
     if (playerResponse !== value.playerResponse)
       result = { ...result, playerResponse };
   }
@@ -266,15 +176,14 @@ export function addHungarianSubtitles(
 
 export function createCaptionParser(
   originalParse: typeof JSON.parse,
-  isEnabled: () => boolean,
-  registerSources?: RegisterSources
+  isEnabled: () => boolean
 ): typeof JSON.parse {
   return function (this: unknown, ...args: Parameters<typeof JSON.parse>) {
     // Keep parse errors, revivers and any previously installed hook intact.
     const result = originalParse.apply(this, args);
     try {
       if (!isEnabled()) return result;
-      const translated = addHungarianSubtitles(result, registerSources);
+      const translated = addHungarianSubtitles(result);
       if (translated !== result)
         console.info('[subtitles] Added Hungarian auto-translation option');
       return translated;
